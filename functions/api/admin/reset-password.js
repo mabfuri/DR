@@ -2,7 +2,7 @@ export async function onRequestPost(context) {
   const { request, env } = context
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } })
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.SUPABASE_ANON_KEY) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Server belum dikonfigurasi untuk reset password.' }, 500)
   }
 
@@ -16,9 +16,9 @@ export async function onRequestPost(context) {
   if (!userId || password.length < 8) return json({ error: 'User dan password minimal 8 karakter wajib diisi.' }, 400)
 
   const userResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: authHeader }
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: authHeader }
   })
-  if (!userResponse.ok) return json({ error: 'Sesi login tidak valid atau sudah kedaluwarsa.' }, 401)
+  if (!userResponse.ok) return json({ error: 'Sesi login tidak valid ou já expirou.' }, 401)
   const currentUser = await userResponse.json()
 
   const profileResponse = await fetch(`${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(currentUser.id)}&select=role`, {
