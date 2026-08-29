@@ -19,8 +19,19 @@ export default function Admin({ profile }) {
     loadUsers()
   }, [])
 
+  async function logout() {
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
+
   return <main className="dashboard">
-    <header className="topbar"><div className="brand">DollarRise Admin</div><span className="badge">ADMIN</span></header>
+    <header className="topbar">
+      <div className="brand">DollarRise Admin</div>
+      <div className="topbar-actions">
+        <span className="badge">ADMIN</span>
+        <button type="button" onClick={logout}>Logout</button>
+      </div>
+    </header>
     <section className="hero"><p className="eyebrow">ADMIN PANEL</p><h1>Selamat datang, {profile?.username || 'Admin'}</h1><p className="muted">Kelola user dan saldo DollarRise dari panel admin.</p></section>
     <AdminUsers />
     {usersError && <div className="error card">{usersError}</div>}
