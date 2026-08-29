@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const emptyForm = { username: '', email: '', password: '', role: 'user', level: 'free', status: 'active', exclusiveLink: '', dashboardLink: '' }
@@ -13,6 +13,7 @@ export default function AdminUsers() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [search, setSearch] = useState('')
 
   async function loadUsers() {
     setLoading(true)
@@ -82,6 +83,12 @@ export default function AdminUsers() {
   }
 
   const field = (key, value) => setForm(current => ({ ...current, [key]: value }))
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return users
+    return users.filter(user => [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link]
+      .some(value => String(value || '').toLowerCase().includes(query)))
+  }, [users, search])
 
   if (loading) return <section className="card"><p>Memuat daftar user...</p></section>
 
@@ -90,9 +97,16 @@ export default function AdminUsers() {
       <div><h2>Manajemen User</h2><p className="muted">Kelola level, status, link, dan password user dari Admin.</p></div>
       <button type="button" onClick={() => { setShowCreate(true); setError(''); setNotice('') }} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',boxShadow:'0 10px 26px rgba(53,211,153,.16)',whiteSpace:'nowrap'}}>＋ Tambah User</button>
     </div>
+    <div className="card admin-user-search">
+      <span className="search-icon" aria-hidden="true">⌕</span>
+      <input aria-label="Cari user" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username, ID, role, level, status, atau link..." />
+      {search && <button type="button" className="search-clear" onClick={() => setSearch('')} aria-label="Hapus pencarian">✕</button>}
+      <span className="search-count">{filteredUsers.length}/{users.length}</span>
+    </div>
     {error && <div className="error card" style={{padding:14,marginTop:12}}>{error}</div>}
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
-    {users.map(user => <article className="card user-row" key={user.id}>
+    {filteredUsers.length === 0 && <div className="card admin-empty"><strong>{search ? 'User tidak ditemukan' : 'Belum ada user'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Belum ada data user untuk ditampilkan.'}</p></div>}
+    {filteredUsers.map(user => <article className="card user-row" key={user.id}>
       <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small">{user.id}</p></div>
       <label>Level<select value={user.level || 'free'} disabled={saving === user.id} onChange={e => updateUser(user.id, { level: e.target.value })}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
       <label>Status<select value={user.status || 'active'} disabled={saving === user.id} onChange={e => updateUser(user.id, { status: e.target.value })}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
