@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import '../admin-offers.css'
 
 const emptyForm = { userId: '', title: '', link: '', status: 'active', sortOrder: 0 }
 
