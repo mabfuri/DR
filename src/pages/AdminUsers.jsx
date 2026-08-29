@@ -88,6 +88,14 @@ export default function AdminUsers() {
       <div><h2>Manajemen User</h2><p className="muted">Kelola level, status, link, dan password user dari Admin.</p></div>
       <button type="button" onClick={() => { setShowCreate(true); setError(''); setNotice('') }} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',boxShadow:'0 10px 26px rgba(53,211,153,.16)',whiteSpace:'nowrap'}}>＋ Tambah User</button>
     </div>
+
+    <div className="admin-user-stats" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:10,marginTop:12}}>
+      <div className="card" style={{padding:'14px 15px'}}><span className="muted small">Total User</span><strong style={{display:'block',fontSize:24,marginTop:4}}>{users.length}</strong><span className="muted small">Semua akun</span></div>
+      <div className="card" style={{padding:'14px 15px'}}><span className="muted small">Active</span><strong style={{display:'block',fontSize:24,marginTop:4}}>🟢 {activeCount}</strong><span className="muted small">Akun aktif</span></div>
+      <div className="card" style={{padding:'14px 15px'}}><span className="muted small">Suspended</span><strong style={{display:'block',fontSize:24,marginTop:4}}>🔴 {suspendedCount}</strong><span className="muted small">Akun ditangguhkan</span></div>
+      <div className="card" style={{padding:'14px 15px'}}><span className="muted small">VIP</span><strong style={{display:'block',fontSize:24,marginTop:4}}>👑 {vipCount}</strong><span className="muted small">Member: {memberCount}</span></div>
+    </div>
+
     <div className="card admin-user-search" style={{display:'flex',alignItems:'center',gap:10,marginTop:12,padding:'10px 12px',border:'1px solid var(--border)',borderRadius:14,background:'rgba(17,26,43,.62)',boxShadow:'0 12px 30px rgba(0,0,0,.12)'}}>
       <span aria-hidden="true" style={{fontSize:20,lineHeight:1,color:'var(--primary)'}}>⌕</span>
       <input aria-label="Cari user" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username, ID, role, level, status, atau link..." style={{border:0,boxShadow:'none',background:'transparent',padding:'7px 0',flex:1,minWidth:0,outline:'none'}} />
