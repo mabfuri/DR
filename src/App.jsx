@@ -8,12 +8,6 @@ import Admin from './pages/Admin'
 import ProtectedRoute from './components/ProtectedRoute'
 import './hero-tweaks.css'
 
-const offers = [
-  { name: 'Demo User 1', link: '#' },
-  { name: 'Demo User 2', link: '#' },
-  { name: 'Demo User 3', link: '#' },
-]
-
 function ConfigNotice() {
   return <main className="auth-page"><section className="card auth-card">
     <div className="brand">DollarRise</div>
@@ -26,9 +20,29 @@ function ConfigNotice() {
 
 function Dashboard({ profile }) {
   const navigate = useNavigate()
+  const [offers, setOffers] = useState([])
   const [index, setIndex] = useState(0)
+  const [offerError, setOfferError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    async function loadOffers() {
+      const { data, error } = await supabase
+        .from('offers')
+        .select('id,title,link,user_id,sort_order,profiles(username)')
+        .eq('status', 'active')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false })
+      if (!mounted) return
+      if (error) setOfferError(error.message)
+      else { setOffers(data || []); setIndex(0) }
+    }
+    loadOffers()
+    return () => { mounted = false }
+  }, [])
+
   const offer = offers[index]
-  const move = (step) => setIndex(i => (i + step + offers.length) % offers.length)
+  const move = (step) => setIndex(i => offers.length ? (i + step + offers.length) % offers.length : 0)
 
   async function logout() {
     await signOut()
@@ -65,11 +79,13 @@ function Dashboard({ profile }) {
     </section>
     <section className="offer card">
       <p className="muted offer-label">OFFER BY</p>
-      <h2>{offer.name}</h2>
+      <h2>{offer ? (offer.profiles?.username || 'User') : 'Belum ada offer aktif'}</h2>
+      {offer && <p className="muted small" style={{marginTop:-8}}>{offer.title}</p>}
+      {offerError && <p className="error small">{offerError}</p>}
       <div className="offer-nav">
-        <button className="offer-prev" onClick={() => move(-1)}>← PREVIOUS OFFER</button>
-        <a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a>
-        <button className="offer-next" onClick={() => move(1)}>NEXT OFFER →</button>
+        <button className="offer-prev" disabled={offers.length < 2} onClick={() => move(-1)}>← PREVIOUS OFFER</button>
+        {offer ? <a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a> : <span className="unlock" aria-disabled="true">🔒 BELUM TERSEDIA</span>}
+        <button className="offer-next" disabled={offers.length < 2} onClick={() => move(1)}>NEXT OFFER →</button>
       </div>
       <div className="performance">
         {stats.map(([label, value]) => <div className="stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}
