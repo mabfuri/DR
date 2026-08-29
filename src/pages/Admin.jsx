@@ -24,11 +24,16 @@ export default function Admin({ profile }) {
     window.location.href = '/'
   }
 
+  function goToDashboard() {
+    window.location.href = '/dashboard'
+  }
+
   return <main className="dashboard">
     <header className="topbar">
       <div className="brand">DollarRise Admin</div>
       <div className="topbar-actions">
         <span className="badge">ADMIN</span>
+        <button type="button" onClick={goToDashboard}>Dashboard User</button>
         <button type="button" onClick={logout}>Logout</button>
       </div>
     </header>
