@@ -21,15 +21,17 @@ export default function Register() {
     finally { setLoading(false) }
   }
 
-  return <main className="auth-page"><section className="card auth-card">
-    <div className="brand">DollarRise</div><h1>Register</h1><p className="muted">Buat akun baru.</p>
+  return <main className="auth-page"><section className="card auth-card auth-premium">
+    <div className="auth-glow" aria-hidden="true" />
+    <div className="brand">DollarRise</div>
+    <div className="auth-heading"><span className="auth-icon">✦</span><div><p className="eyebrow">GET STARTED</p><h1>Register</h1><p className="muted">Buat akun baru untuk memulai.</p></div></div>
     <form onSubmit={submit}>
-      <label>Username<input value={username} onChange={e => setUsername(e.target.value)} minLength={3} required autoComplete="username" /></label>
-      <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" /></label>
-      <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={6} required autoComplete="new-password" /></label>
+      <label>Username<input value={username} onChange={e => setUsername(e.target.value)} minLength={3} required autoComplete="username" placeholder="Username Anda" /></label>
+      <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="nama@email.com" /></label>
+      <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={6} required autoComplete="new-password" placeholder="Minimal 6 karakter" /></label>
       {error && <p className="error">{error}</p>}{message && <p className="success">{message}</p>}
-      <button disabled={loading}>{loading ? 'MEMPROSES...' : 'REGISTER'}</button>
+      <button disabled={loading}>{loading ? 'MEMPROSES...' : 'BUAT AKUN →'}</button>
     </form>
-    <p className="muted">Sudah punya akun? <Link to="/login">Login</Link></p>
+    <p className="auth-footer muted">Sudah punya akun? <Link to="/login">Login</Link></p>
   </section></main>
 }
