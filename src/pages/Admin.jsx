@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import AdminUsers from './AdminUsers'
 import AdminBalances from './AdminBalances'
 import AdminOffers from './AdminOffers'
+import AdminRewards from './AdminRewards'
 
 export default function Admin({ profile }) {
   const [users, setUsers] = useState([])
@@ -39,13 +40,14 @@ export default function Admin({ profile }) {
         <button type="button" className="ghost" onClick={logout}>Logout</button>
       </div>
     </header>
-    <section className="hero"><p className="eyebrow">ADMIN PANEL</p><h1>Selamat datang, {profile?.username || 'Admin'}</h1><p className="muted">Kelola user, saldo, dan offer DollarRise dari satu panel.</p></section>
+    <section className="hero"><p className="eyebrow">ADMIN PANEL</p><h1>Selamat datang, {profile?.username || 'Admin'}</h1><p className="muted">Kelola user, saldo, offer, dan reward DollarRise dari satu panel.</p></section>
     <section className="admin-tabs" aria-label="Admin navigation">
       <button type="button" className={activeTab === 'users' ? 'admin-tab active' : 'admin-tab'} onClick={() => setActiveTab('users')}>👥 Manajemen User</button>
       <button type="button" className={activeTab === 'balances' ? 'admin-tab active' : 'admin-tab'} onClick={() => setActiveTab('balances')}>💰 Manajemen Saldo</button>
       <button type="button" className={activeTab === 'offers' ? 'admin-tab active' : 'admin-tab'} onClick={() => setActiveTab('offers')}>🎯 Manajemen Offer</button>
+      <button type="button" className={activeTab === 'rewards' ? 'admin-tab active' : 'admin-tab'} onClick={() => setActiveTab('rewards')}>⚙️ Pengaturan Reward</button>
     </section>
     {usersError && <div className="error card admin-message">{usersError}</div>}
-    {activeTab === 'users' ? <AdminUsers /> : activeTab === 'balances' ? <AdminBalances users={users} /> : <AdminOffers users={users} />}
+    {activeTab === 'users' ? <AdminUsers /> : activeTab === 'balances' ? <AdminBalances users={users} /> : activeTab === 'offers' ? <AdminOffers users={users} /> : <AdminRewards />}
   </main>
 }
