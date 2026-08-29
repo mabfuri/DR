@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const emptyForm = { username: '', email: '', password: '', role: 'user', level: 'free', status: 'active', exclusiveLink: '', dashboardLink: '' }
+const emptyForm = { username: '', email: '', password: '', role: 'user', level: 'free', status: 'active', dashboardLink: '' }
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
@@ -22,7 +22,7 @@ export default function AdminUsers() {
 
   async function loadUsers() {
     setLoading(true)
-    const { data, error: loadError } = await supabase.from('profiles').select('id,username,role,level,status,exclusive_link,personal_dashboard_link,created_at').order('created_at', { ascending: false })
+    const { data, error: loadError } = await supabase.from('profiles').select('id,username,role,level,status,personal_dashboard_link,created_at').order('created_at', { ascending: false })
     if (loadError) setError(loadError.message)
     else setUsers(data || [])
     setLoading(false)
@@ -39,7 +39,7 @@ export default function AdminUsers() {
 
   function openEdit(user) {
     setEditingUser(user)
-    setEditForm({ username: user.username || '', role: user.role || 'user', level: user.level || 'free', status: user.status || 'active', exclusiveLink: user.exclusive_link || '', dashboardLink: user.personal_dashboard_link || '' })
+    setEditForm({ username: user.username || '', role: user.role || 'user', level: user.level || 'free', status: user.status || 'active', dashboardLink: user.personal_dashboard_link || '' })
     setError(''); setNotice('')
   }
 
@@ -55,7 +55,7 @@ export default function AdminUsers() {
     const username = editForm.username.trim()
     if (!username) { setError('Username wajib diisi.'); return }
     setSavingEdit(true); setError(''); setNotice('')
-    const patch = { username, role: editForm.role, level: editForm.level, status: editForm.status, exclusive_link: editForm.exclusiveLink.trim() || null, personal_dashboard_link: editForm.dashboardLink.trim() || null }
+    const patch = { username, role: editForm.role, level: editForm.level, status: editForm.status, personal_dashboard_link: editForm.dashboardLink.trim() || null }
     const { error: updateError } = await supabase.from('profiles').update(patch).eq('id', editingUser.id)
     if (updateError) setError(updateError.message)
     else {
@@ -103,7 +103,7 @@ export default function AdminUsers() {
       const normalizedLevel = (user.level || 'free').toLowerCase()
       const matchesStatus = statusFilter === 'all' || (user.status || 'active').toLowerCase() === statusFilter
       const matchesLevel = levelFilter === 'all' || (levelFilter === 'member' ? ['member', 'free', 'basic', 'premium'].includes(normalizedLevel) : normalizedLevel === levelFilter)
-      const matchesSearch = !query || [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query))
+      const matchesSearch = !query || [user.username, user.id, user.role, user.level, user.status, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query))
       return matchesStatus && matchesLevel && matchesSearch
     })
   }, [users, search, statusFilter, levelFilter])
@@ -153,7 +153,6 @@ export default function AdminUsers() {
       <button type="button" onClick={() => openEdit(user)} disabled={saving === user.id} style={{whiteSpace:'nowrap'}}>✏️ Edit User</button>
       <label>Level<select value={user.level || 'free'} disabled={saving === user.id} onChange={e => updateUser(user.id, { level: e.target.value })}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
       <label>Status<select value={user.status || 'active'} disabled={saving === user.id} onChange={e => updateUser(user.id, { status: e.target.value })}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
-      <label>Exclusive Link<input defaultValue={user.exclusive_link || ''} disabled={saving === user.id} onBlur={e => updateUser(user.id, { exclusive_link: e.target.value || null })} placeholder="https://..." /></label>
       <label>Dashboard Link<input defaultValue={user.personal_dashboard_link || ''} disabled={saving === user.id} onBlur={e => updateUser(user.id, { personal_dashboard_link: e.target.value || null })} placeholder="https://..." /></label>
       <label>Password Baru<input type="password" minLength="8" value={passwords[user.id] || ''} disabled={saving === user.id} onChange={e => setPasswords(value => ({ ...value, [user.id]: e.target.value }))} placeholder="Minimal 8 karakter" /></label>
       <button disabled={saving === user.id} onClick={() => resetPassword(user)}>🔑 Reset Password</button>
@@ -170,7 +169,6 @@ export default function AdminUsers() {
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Role<select value={editForm.role} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,role:e.target.value}))}><option value="user">User</option><option value="admin">Admin</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Level<select value={editForm.level} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,level:e.target.value}))}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Status<select value={editForm.status} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,status:e.target.value}))}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
-          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Exclusive Link<input type="url" value={editForm.exclusiveLink} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,exclusiveLink:e.target.value}))} placeholder="https://..." /></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Dashboard Link<input type="url" value={editForm.dashboardLink} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,dashboardLink:e.target.value}))} placeholder="https://..." /></label>
         </div>
         <div style={{display:'flex',justifyContent:'flex-end',gap:9,marginTop:20}}><button type="button" className="ghost" disabled={savingEdit} onClick={closeEdit}>Batal</button><button type="submit" disabled={savingEdit} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',minWidth:155}}>{savingEdit ? 'Menyimpan...' : '✓ Simpan Perubahan'}</button></div>
@@ -187,7 +185,6 @@ export default function AdminUsers() {
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Role<select value={form.role} disabled={creating} onChange={e => field('role',e.target.value)}><option value="user">User</option><option value="admin">Admin</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Level<select value={form.level} disabled={creating} onChange={e => field('level',e.target.value)}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Status<select value={form.status} disabled={creating} onChange={e => field('status',e.target.value)}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
-          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Exclusive Link<input type="url" value={form.exclusiveLink} disabled={creating} onChange={e => field('exclusiveLink',e.target.value)} placeholder="https://..." /></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Dashboard Link<input type="url" value={form.dashboardLink} disabled={creating} onChange={e => field('dashboardLink',e.target.value)} placeholder="https://..." /></label>
         </div>
         <div style={{display:'flex',justifyContent:'flex-end',gap:9,marginTop:20}}><button type="button" className="ghost" disabled={creating} onClick={() => setShowCreate(false)}>Batal</button><button type="submit" disabled={creating} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',minWidth:140}}>{creating ? 'Membuat...' : '✓ Buat User'}</button></div>
