@@ -84,7 +84,7 @@ function Dashboard({ profile }) {
       {offerError && <p className="error small">{offerError}</p>}
       <div className="offer-nav">
         <button className="offer-prev" disabled={offers.length < 2} onClick={() => move(-1)}>← PREVIOUS OFFER</button>
-        {offer ? <a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a> : <span className="unlock" aria-disabled="true">🔒 BELUM TERSEDIA</span>}
+        {offer ? <a className="unlock" href={offer.link} target="_blank" rel="noopener noreferrer">🔒 UNLOCK EXCLUSIVE ACCESS</a> : <span className="unlock" aria-disabled="true">🔒 BELUM TERSEDIA</span>}
         <button className="offer-next" disabled={offers.length < 2} onClick={() => move(1)}>NEXT OFFER →</button>
       </div>
       <div className="performance">
