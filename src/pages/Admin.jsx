@@ -6,6 +6,7 @@ import AdminBalances from './AdminBalances'
 export default function Admin({ profile }) {
   const [users, setUsers] = useState([])
   const [usersError, setUsersError] = useState('')
+  const [activeTab, setActiveTab] = useState('users')
 
   useEffect(() => {
     async function loadUsers() {
@@ -33,13 +34,16 @@ export default function Admin({ profile }) {
       <div className="brand">DollarRise Admin</div>
       <div className="topbar-actions">
         <span className="badge">ADMIN</span>
-        <button type="button" onClick={goToDashboard}>Dashboard User</button>
-        <button type="button" onClick={logout}>Logout</button>
+        <button type="button" className="ghost" onClick={goToDashboard}>Dashboard User</button>
+        <button type="button" className="ghost" onClick={logout}>Logout</button>
       </div>
     </header>
-    <section className="hero"><p className="eyebrow">ADMIN PANEL</p><h1>Selamat datang, {profile?.username || 'Admin'}</h1><p className="muted">Kelola user dan saldo DollarRise dari panel admin.</p></section>
-    <AdminUsers />
-    {usersError && <div className="error card">{usersError}</div>}
-    <AdminBalances users={users} />
+    <section className="hero"><p className="eyebrow">ADMIN PANEL</p><h1>Selamat datang, {profile?.username || 'Admin'}</h1><p className="muted">Kelola user dan saldo DollarRise dari satu panel.</p></section>
+    <section className="admin-tabs" aria-label="Admin navigation">
+      <button type="button" className={activeTab === 'users' ? 'admin-tab active' : 'admin-tab'} onClick={() => setActiveTab('users')}>👥 Manajemen User</button>
+      <button type="button" className={activeTab === 'balances' ? 'admin-tab active' : 'admin-tab'} onClick={() => setActiveTab('balances')}>💰 Manajemen Saldo</button>
+    </section>
+    {usersError && <div className="error card admin-message">{usersError}</div>}
+    {activeTab === 'users' ? <AdminUsers /> : <AdminBalances users={users} />}
   </main>
 }
