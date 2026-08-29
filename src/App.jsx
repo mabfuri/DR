@@ -35,7 +35,14 @@ function Dashboard({ profile }) {
   }
 
   return <main className="dashboard">
-    <header className="topbar"><div className="brand">DollarRise</div><div><span className="badge">{profile?.level?.toUpperCase() || 'FREE'}</span><button className="ghost" onClick={logout}>Logout</button></div></header>
+    <header className="topbar">
+      <div className="brand">DollarRise</div>
+      <div>
+        <span className="badge">{profile?.level?.toUpperCase() || 'FREE'}</span>
+        {profile?.role === 'admin' && <button className="ghost" onClick={() => navigate('/admin')}>Akses Admin</button>}
+        <button className="ghost" onClick={logout}>Logout</button>
+      </div>
+    </header>
     <section className="hero"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username || 'User'} Dashboard</h1></section>
     <section className="stats">{['Impressions','Clicks','CTR','CPM','Revenue'].map(label => <div className="stat card" key={label}><span>{label}</span><strong>{label === 'Revenue' ? 'Rp0' : '0'}</strong></div>)}</section>
     <section className="offer card"><p className="muted">OFFER BY</p><h2>{offer.name}</h2><a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a><div className="offer-nav"><button onClick={() => move(-1)}>← PREVIOUS OFFER</button><button onClick={() => move(1)}>NEXT OFFER →</button></div></section>
