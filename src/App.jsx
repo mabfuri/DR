@@ -13,6 +13,16 @@ const offers = [
   { name: 'Demo User 3', link: '#' },
 ]
 
+function ConfigNotice() {
+  return <main className="auth-page"><section className="card auth-card">
+    <div className="brand">DollarRise</div>
+    <h1>Konfigurasi belum lengkap</h1>
+    <p className="muted">Aplikasi berhasil dimuat, tetapi Supabase belum terhubung.</p>
+    <div className="notice"><strong>Yang diperlukan:</strong><br />VITE_SUPABASE_URL<br />VITE_SUPABASE_ANON_KEY</div>
+    <p className="muted small">Tambahkan kedua Environment Variable tersebut di Cloudflare Pages, lalu lakukan redeploy.</p>
+  </section></main>
+}
+
 function Dashboard({ profile }) {
   const navigate = useNavigate()
   const [index, setIndex] = useState(0)
@@ -20,11 +30,12 @@ function Dashboard({ profile }) {
   const move = (step) => setIndex(i => (i + step + offers.length) % offers.length)
 
   async function logout() {
-    await signOut(); navigate('/login', { replace: true })
+    await signOut()
+    navigate('/login', { replace: true })
   }
 
   return <main className="dashboard">
-    <header className="topbar"><div className="brand">DollarRise</div><div><span className="badge">{profile?.level?.toUpperCase()}</span><button className="ghost" onClick={logout}>Logout</button></div></header>
+    <header className="topbar"><div className="brand">DollarRise</div><div><span className="badge">{profile?.level?.toUpperCase() || 'FREE'}</span><button className="ghost" onClick={logout}>Logout</button></div></header>
     <section className="hero"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username || 'User'} Dashboard</h1></section>
     <section className="stats">{['Impressions','Clicks','CTR','CPM','Revenue'].map(label => <div className="stat card" key={label}><span>{label}</span><strong>{label === 'Revenue' ? 'Rp0' : '0'}</strong></div>)}</section>
     <section className="offer card"><p className="muted">OFFER BY</p><h2>{offer.name}</h2><a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a><div className="offer-nav"><button onClick={() => move(-1)}>← PREVIOUS OFFER</button><button onClick={() => move(1)}>NEXT OFFER →</button></div></section>
@@ -41,20 +52,19 @@ function AppRoutes({ session, profile }) {
   </Routes>
 }
 
-export default function App() {
+function AuthenticatedApp() {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!supabase) { setLoading(false); return }
     let mounted = true
     async function load() {
       const { data } = await supabase.auth.getSession()
       if (!mounted) return
       setSession(data.session)
       if (data.session) {
-        try { setProfile(await getProfile(data.session.user.id)) } catch { setProfile(null) }
+        try { setProfile(await getProfile(data.session.user.id)) } catch (error) { console.error('Profile load failed:', error) }
       }
       setLoading(false)
     }
@@ -62,14 +72,16 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       setSession(nextSession)
       if (nextSession) {
-        try { setProfile(await getProfile(nextSession.user.id)) } catch { setProfile(null) }
+        try { setProfile(await getProfile(nextSession.user.id)) } catch (error) { console.error('Profile load failed:', error); setProfile(null) }
       } else setProfile(null)
     })
     return () => { mounted = false; listener.subscription.unsubscribe() }
   }, [])
 
   if (loading) return <main className="auth-page"><section className="card auth-card"><div className="brand">DollarRise</div><p>Memuat...</p></section></main>
-  if (!supabase) return <main className="auth-page"><section className="card auth-card"><div className="brand">DollarRise</div><p className="error">Supabase belum dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.</p></section></main>
-
   return <BrowserRouter><AppRoutes session={session} profile={profile} /></BrowserRouter>
+}
+
+export default function App() {
+  return supabase ? <AuthenticatedApp /> : <ConfigNotice />
 }
