@@ -12,6 +12,9 @@ export default function AdminUsers() {
   const [passwords, setPasswords] = useState({})
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editForm, setEditForm] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -32,6 +35,35 @@ export default function AdminUsers() {
     if (updateError) setError(updateError.message)
     else { setUsers(list => list.map(user => user.id === id ? { ...user, ...patch } : user)); setNotice('Perubahan user berhasil disimpan.') }
     setSaving(null)
+  }
+
+  function openEdit(user) {
+    setEditingUser(user)
+    setEditForm({ username: user.username || '', role: user.role || 'user', level: user.level || 'free', status: user.status || 'active', exclusiveLink: user.exclusive_link || '', dashboardLink: user.personal_dashboard_link || '' })
+    setError(''); setNotice('')
+  }
+
+  function closeEdit() {
+    if (savingEdit) return
+    setEditingUser(null)
+    setEditForm(null)
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault()
+    if (!editingUser || !editForm) return
+    const username = editForm.username.trim()
+    if (!username) { setError('Username wajib diisi.'); return }
+    setSavingEdit(true); setError(''); setNotice('')
+    const patch = { username, role: editForm.role, level: editForm.level, status: editForm.status, exclusive_link: editForm.exclusiveLink.trim() || null, personal_dashboard_link: editForm.dashboardLink.trim() || null }
+    const { error: updateError } = await supabase.from('profiles').update(patch).eq('id', editingUser.id)
+    if (updateError) setError(updateError.message)
+    else {
+      setUsers(list => list.map(user => user.id === editingUser.id ? { ...user, ...patch } : user))
+      setEditingUser(null); setEditForm(null)
+      setNotice(`Profil ${username} berhasil diperbarui.`)
+    }
+    setSavingEdit(false)
   }
 
   async function resetPassword(user) {
@@ -70,7 +102,7 @@ export default function AdminUsers() {
     return users.filter(user => {
       const normalizedLevel = (user.level || 'free').toLowerCase()
       const matchesStatus = statusFilter === 'all' || (user.status || 'active').toLowerCase() === statusFilter
-      const matchesLevel = levelFilter === 'all' || normalizedLevel === levelFilter
+      const matchesLevel = levelFilter === 'all' || (levelFilter === 'member' ? ['member', 'free', 'basic', 'premium'].includes(normalizedLevel) : normalizedLevel === levelFilter)
       const matchesSearch = !query || [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query))
       return matchesStatus && matchesLevel && matchesSearch
     })
@@ -116,7 +148,9 @@ export default function AdminUsers() {
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
     {filteredUsers.length === 0 && <div className="card" style={{padding:20,marginTop:12}}><strong>{search ? 'User tidak ditemukan' : 'Tidak ada user pada filter ini'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Coba pilih filter status atau level lainnya.'}</p></div>}
     {filteredUsers.map(user => <article className="card user-row" key={user.id}>
-      <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small">{user.id}</p></div>
+      <div style={{minWidth:0}}><strong>{user.username || 'Tanpa username'}</strong><p className="muted small">{user.id}</p></div>
+      <div style={{display:'flex',gap:7,alignItems:'center',flexWrap:'wrap'}}><span className="muted small">{(user.status || 'active') === 'active' ? '🟢 Active' : '🔴 Suspended'}</span><span className="muted small">{(user.level || '').toLowerCase() === 'vip' ? '👑 VIP' : '👤 Member'}</span></div>
+      <button type="button" onClick={() => openEdit(user)} disabled={saving === user.id} style={{whiteSpace:'nowrap'}}>✏️ Edit User</button>
       <label>Level<select value={user.level || 'free'} disabled={saving === user.id} onChange={e => updateUser(user.id, { level: e.target.value })}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
       <label>Status<select value={user.status || 'active'} disabled={saving === user.id} onChange={e => updateUser(user.id, { status: e.target.value })}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
       <label>Exclusive Link<input defaultValue={user.exclusive_link || ''} disabled={saving === user.id} onBlur={e => updateUser(user.id, { exclusive_link: e.target.value || null })} placeholder="https://..." /></label>
@@ -124,6 +158,24 @@ export default function AdminUsers() {
       <label>Password Baru<input type="password" minLength="8" value={passwords[user.id] || ''} disabled={saving === user.id} onChange={e => setPasswords(value => ({ ...value, [user.id]: e.target.value }))} placeholder="Minimal 8 karakter" /></label>
       <button disabled={saving === user.id} onClick={() => resetPassword(user)}>🔑 Reset Password</button>
     </article>)}
+
+    {editingUser && editForm && <div role="dialog" aria-modal="true" aria-label="Edit User" style={{position:'fixed',inset:0,zIndex:100,display:'grid',placeItems:'center',padding:16,background:'rgba(0,0,0,.68)',backdropFilter:'blur(8px)'}} onMouseDown={e => e.target === e.currentTarget && closeEdit()}>
+      <form className="card" onSubmit={saveEdit} style={{width:'min(620px,100%)',maxHeight:'92vh',overflowY:'auto',padding:24,border:'1px solid rgba(255,255,255,.1)',boxShadow:'0 30px 90px rgba(0,0,0,.4)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,marginBottom:20}}>
+          <div><p className="eyebrow" style={{margin:'0 0 5px'}}>USER SETTINGS</p><h2 style={{margin:0}}>Edit User</h2><p className="muted small" style={{margin:'5px 0 0',wordBreak:'break-all'}}>{editingUser.id}</p></div>
+          <button type="button" className="ghost" disabled={savingEdit} onClick={closeEdit} aria-label="Tutup">✕</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:14}}>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Username<input required minLength="2" maxLength="50" value={editForm.username} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,username:e.target.value}))} /></label>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Role<select value={editForm.role} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,role:e.target.value}))}><option value="user">User</option><option value="admin">Admin</option></select></label>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Level<select value={editForm.level} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,level:e.target.value}))}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Status<select value={editForm.status} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,status:e.target.value}))}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Exclusive Link<input type="url" value={editForm.exclusiveLink} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,exclusiveLink:e.target.value}))} placeholder="https://..." /></label>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Dashboard Link<input type="url" value={editForm.dashboardLink} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,dashboardLink:e.target.value}))} placeholder="https://..." /></label>
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:9,marginTop:20}}><button type="button" className="ghost" disabled={savingEdit} onClick={closeEdit}>Batal</button><button type="submit" disabled={savingEdit} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',minWidth:155}}>{savingEdit ? 'Menyimpan...' : '✓ Simpan Perubahan'}</button></div>
+      </form>
+    </div>}
 
     {showCreate && <div role="dialog" aria-modal="true" aria-label="Tambah User" style={{position:'fixed',inset:0,zIndex:100,display:'grid',placeItems:'center',padding:18,background:'rgba(0,0,0,.68)',backdropFilter:'blur(8px)'}} onMouseDown={e => e.target === e.currentTarget && !creating && setShowCreate(false)}>
       <form className="card" onSubmit={createUser} style={{width:'min(620px,100%)',maxHeight:'92vh',overflowY:'auto',padding:24}}>
