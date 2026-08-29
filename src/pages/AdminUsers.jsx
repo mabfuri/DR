@@ -15,6 +15,7 @@ export default function AdminUsers() {
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [levelFilter, setLevelFilter] = useState('all')
 
   async function loadUsers() {
     setLoading(true)
@@ -67,14 +68,18 @@ export default function AdminUsers() {
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase()
     return users.filter(user => {
+      const normalizedLevel = (user.level || 'free').toLowerCase()
       const matchesStatus = statusFilter === 'all' || (user.status || 'active').toLowerCase() === statusFilter
+      const matchesLevel = levelFilter === 'all' || normalizedLevel === levelFilter
       const matchesSearch = !query || [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query))
-      return matchesStatus && matchesSearch
+      return matchesStatus && matchesLevel && matchesSearch
     })
-  }, [users, search, statusFilter])
+  }, [users, search, statusFilter, levelFilter])
 
   const activeCount = users.filter(user => (user.status || 'active').toLowerCase() === 'active').length
   const suspendedCount = users.filter(user => (user.status || '').toLowerCase() === 'suspended').length
+  const memberCount = users.filter(user => ['member', 'free', 'basic', 'premium'].includes((user.level || 'free').toLowerCase())).length
+  const vipCount = users.filter(user => (user.level || '').toLowerCase() === 'vip').length
 
   if (loading) return <section className="card"><p>Memuat daftar user...</p></section>
 
@@ -94,9 +99,14 @@ export default function AdminUsers() {
       <button type="button" className={statusFilter === 'active' ? 'status-filter active' : 'status-filter'} onClick={() => setStatusFilter('active')}>🟢 Active <span>{activeCount}</span></button>
       <button type="button" className={statusFilter === 'suspended' ? 'status-filter suspended-active' : 'status-filter'} onClick={() => setStatusFilter('suspended')}>🔴 Suspended <span>{suspendedCount}</span></button>
     </div>
+    <div className="admin-level-filter" role="group" aria-label="Filter level user" style={{display:'flex',alignItems:'center',gap:7,marginTop:7,overflowX:'auto',paddingBottom:2}}>
+      <button type="button" className={levelFilter === 'all' ? 'status-filter active' : 'status-filter'} onClick={() => setLevelFilter('all')}>Semua Level <span>{users.length}</span></button>
+      <button type="button" className={levelFilter === 'member' ? 'status-filter active' : 'status-filter'} onClick={() => setLevelFilter('member')}>👤 Member <span>{memberCount}</span></button>
+      <button type="button" className={levelFilter === 'vip' ? 'status-filter vip-active' : 'status-filter'} onClick={() => setLevelFilter('vip')}>👑 VIP <span>{vipCount}</span></button>
+    </div>
     {error && <div className="error card" style={{padding:14,marginTop:12}}>{error}</div>}
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
-    {filteredUsers.length === 0 && <div className="card" style={{padding:20,marginTop:12}}><strong>{search ? 'User tidak ditemukan' : 'Tidak ada user pada filter ini'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Coba pilih filter status lainnya.'}</p></div>}
+    {filteredUsers.length === 0 && <div className="card" style={{padding:20,marginTop:12}}><strong>{search ? 'User tidak ditemukan' : 'Tidak ada user pada filter ini'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Coba pilih filter status atau level lainnya.'}</p></div>}
     {filteredUsers.map(user => <article className="card user-row" key={user.id}>
       <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small">{user.id}</p></div>
       <label>Level<select value={user.level || 'free'} disabled={saving === user.id} onChange={e => updateUser(user.id, { level: e.target.value })}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
