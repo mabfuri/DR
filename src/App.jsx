@@ -55,10 +55,10 @@ function Dashboard({ profile }) {
     <section className="offer card">
       <p className="muted offer-label">OFFER BY</p>
       <h2>{offer.name}</h2>
-      <a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a>
       <div className="offer-nav">
-        <button onClick={() => move(-1)}>← PREVIOUS OFFER</button>
-        <button onClick={() => move(1)}>NEXT OFFER →</button>
+        <button className="offer-prev" onClick={() => move(-1)}>← PREVIOUS OFFER</button>
+        <a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a>
+        <button className="offer-next" onClick={() => move(1)}>NEXT OFFER →</button>
       </div>
       <div className="performance">
         {stats.map(([label, value]) => <div className="stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}
