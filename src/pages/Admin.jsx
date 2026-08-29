@@ -13,7 +13,7 @@ export default function Admin({ profile }) {
     async function loadUsers() {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id,username,role,level,status,exclusive_link,personal_dashboard_link,created_at')
+        .select('id,username,role,level,status,personal_dashboard_link,created_at')
         .order('created_at', { ascending: false })
       if (error) setUsersError(error.message)
       else setUsers(data || [])
