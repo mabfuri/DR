@@ -13,6 +13,8 @@ export async function onRequestPost(context) {
 
   const authHeader = request.headers.get('Authorization') || ''
   if (!authHeader.startsWith('Bearer ')) return json({ error: 'Sesi admin tidak ditemukan.' }, 401)
+  const token = authHeader.slice(7).trim()
+  if (!token) return json({ error: 'Sesi admin tidak ditemukan.' }, 401)
 
   let body
   try { body = await request.json() } catch { return json({ error: 'Request tidak valid.' }, 400) }
@@ -34,12 +36,12 @@ export async function onRequestPost(context) {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  const token = authHeader.slice(7)
   const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token)
   if (userError || !userData?.user) return json({ error: 'Sesi login tidak valid atau sudah kedaluwarsa.' }, 401)
 
+  const adminId = userData.user.id
   const { data: adminProfile, error: adminError } = await supabaseAdmin
-    .from('profiles').select('role').eq('id', userData.user.id).maybeSingle()
+    .from('profiles').select('role').eq('id', adminId).maybeSingle()
   if (adminError) return json({ error: `Gagal memeriksa role admin: ${adminError.message}` }, 500)
   if (String(adminProfile?.role || '').trim().toLowerCase() !== 'admin') return json({ error: 'Akses admin diperlukan.' }, 403)
 
@@ -57,11 +59,16 @@ export async function onRequestPost(context) {
   if (createError || !created?.user) return json({ error: createError?.message || 'Gagal membuat akun.' }, 400)
 
   const newUserId = created.user.id
-  const { error: profileError } = await supabaseAdmin.from('profiles').update({
-    username, role, level, status,
-    exclusive_link: exclusiveLink || null,
-    personal_dashboard_link: dashboardLink || null
-  }).eq('id', newUserId)
+  const { error: profileError } = await supabaseAdmin.rpc('admin_update_profile', {
+    p_admin_id: adminId,
+    p_user_id: newUserId,
+    p_username: username,
+    p_role: role,
+    p_level: level,
+    p_status: status,
+    p_exclusive_link: exclusiveLink || null,
+    p_dashboard_link: dashboardLink || null
+  })
 
   if (profileError) {
     await supabaseAdmin.auth.admin.deleteUser(newUserId)
