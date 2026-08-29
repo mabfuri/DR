@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Admin from './pages/Admin'
 import ProtectedRoute from './components/ProtectedRoute'
+import './hero-tweaks.css'
 
 const offers = [
   { name: 'Demo User 1', link: '#' },
