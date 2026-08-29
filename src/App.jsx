@@ -53,7 +53,7 @@ function Dashboard({ profile }) {
     </header>
     <section className="hero"><p className="eyebrow">WELCOME BACK</p>
       <div className="user-balance-row">
-        <div className="user-heading"><h1>{profile?.username || 'User'}</h1><span className="badge">{profile?.level?.toUpperCase() || 'FREE'}</span></div>
+        <div className="user-heading"><h1>{profile?.username || 'User'}</h1></div>
         <div className="balance-card" aria-label="Informasi saldo">
           <div className="balance-item"><span>Saldo tersedia:</span><strong>Rp0</strong></div>
           <div className="balance-divider" aria-hidden="true" />
