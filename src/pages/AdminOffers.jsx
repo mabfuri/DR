@@ -75,7 +75,7 @@ export default function AdminOffers({ users }) {
     else { setNotice('Offer berhasil dihapus.'); await loadOffers() }
   }
 
-  return <section className="admin-offers">
+  return <section className="admin-users admin-offers">
     <div className="card" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
       <div><h2>Manajemen Offer</h2><p className="muted">Atur pemilik, link, status, dan urutan offer yang tampil di Dashboard.</p></div>
       <button type="button" onClick={startCreate}>＋ Tambah Offer</button>
