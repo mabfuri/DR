@@ -23,14 +23,16 @@ export default function Login() {
     }
   }
 
-  return <main className="auth-page"><section className="card auth-card">
-    <div className="brand">DollarRise</div><h1>Login</h1><p className="muted">Masuk ke dashboard Anda.</p>
+  return <main className="auth-page"><section className="card auth-card auth-premium">
+    <div className="auth-glow" aria-hidden="true" />
+    <div className="brand">DollarRise</div>
+    <div className="auth-heading"><span className="auth-icon">↗</span><div><p className="eyebrow">WELCOME BACK</p><h1>Login</h1><p className="muted">Masuk ke dashboard Anda.</p></div></div>
     <form onSubmit={submit}>
-      <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" /></label>
-      <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" /></label>
+      <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="nama@email.com" /></label>
+      <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" placeholder="Masukkan password" /></label>
       {error && <p className="error">{error}</p>}
-      <button disabled={loading}>{loading ? 'MEMPROSES...' : 'LOGIN'}</button>
+      <button disabled={loading}>{loading ? 'MEMPROSES...' : 'LOGIN →'}</button>
     </form>
-    <p className="muted">Belum punya akun? <Link to="/register">Register</Link></p>
+    <p className="auth-footer muted">Belum punya akun? <Link to="/register">Buat akun</Link></p>
   </section></main>
 }
