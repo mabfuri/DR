@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 
+const SITE_URL = 'https://dolarrise.pages.dev'
+
 export async function signIn(email, password) {
   if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -12,7 +14,10 @@ export async function signUp(email, password, username) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username } },
+    options: {
+      data: { username },
+      emailRedirectTo: SITE_URL,
+    },
   })
   if (error) throw error
   return data
