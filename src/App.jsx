@@ -53,10 +53,13 @@ function Dashboard({ profile }) {
     </header>
     <section className="hero"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username || 'User'}</h1></section>
     <section className="offer card">
-      <p className="muted">OFFER BY</p>
+      <p className="muted offer-label">OFFER BY</p>
       <h2>{offer.name}</h2>
       <a className="unlock" href={offer.link}>🔒 UNLOCK EXCLUSIVE ACCESS</a>
-      <div className="offer-nav"><button onClick={() => move(-1)}>← PREVIOUS OFFER</button><button onClick={() => move(1)}>NEXT OFFER →</button></div>
+      <div className="offer-nav">
+        <button onClick={() => move(-1)}>← PREVIOUS OFFER</button>
+        <button onClick={() => move(1)}>NEXT OFFER →</button>
+      </div>
       <div className="performance">
         {stats.map(([label, value]) => <div className="stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </div>
