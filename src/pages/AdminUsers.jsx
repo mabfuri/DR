@@ -17,25 +17,18 @@ export default function AdminUsers() {
 
   async function loadUsers() {
     setLoading(true)
-    const { data, error: loadError } = await supabase
-      .from('profiles')
-      .select('id,username,role,level,status,exclusive_link,personal_dashboard_link,created_at')
-      .order('created_at', { ascending: false })
+    const { data, error: loadError } = await supabase.from('profiles').select('id,username,role,level,status,exclusive_link,personal_dashboard_link,created_at').order('created_at', { ascending: false })
     if (loadError) setError(loadError.message)
     else setUsers(data || [])
     setLoading(false)
   }
-
   useEffect(() => { loadUsers() }, [])
 
   async function updateUser(id, patch) {
     setSaving(id); setError(''); setNotice('')
     const { error: updateError } = await supabase.from('profiles').update(patch).eq('id', id)
     if (updateError) setError(updateError.message)
-    else {
-      setUsers(list => list.map(user => user.id === id ? { ...user, ...patch } : user))
-      setNotice('Perubahan user berhasil disimpan.')
-    }
+    else { setUsers(list => list.map(user => user.id === id ? { ...user, ...patch } : user)); setNotice('Perubahan user berhasil disimpan.') }
     setSaving(null)
   }
 
@@ -47,37 +40,24 @@ export default function AdminUsers() {
     const token = sessionData.session?.access_token
     if (!token) { setError('Sesi admin tidak ditemukan.'); setSaving(null); return }
     try {
-      const response = await fetch('/api/admin/reset-password', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, password })
-      })
+      const response = await fetch('/api/admin/reset-password', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, password }) })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || 'Gagal mengganti password user.')
-      setPasswords(value => ({ ...value, [user.id]: '' }))
-      setNotice(`Password ${user.username || 'user'} berhasil diubah.`)
+      setPasswords(value => ({ ...value, [user.id]: '' })); setNotice(`Password ${user.username || 'user'} berhasil diubah.`)
     } catch (e) { setError(e.message) }
     setSaving(null)
   }
 
   async function createUser(e) {
-    e.preventDefault()
-    setCreating(true); setError(''); setNotice('')
+    e.preventDefault(); setCreating(true); setError(''); setNotice('')
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData.session?.access_token
     if (!token) { setError('Sesi admin tidak ditemukan.'); setCreating(false); return }
     try {
-      const response = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
-      })
+      const response = await fetch('/api/admin/create-user', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || 'Gagal membuat user.')
-      setShowCreate(false)
-      setForm(emptyForm)
-      setNotice(`User ${result.user?.username || form.username} berhasil dibuat.`)
-      await loadUsers()
+      setShowCreate(false); setForm(emptyForm); setNotice(`User ${result.user?.username || form.username} berhasil dibuat.`); await loadUsers()
     } catch (e) { setError(e.message) }
     setCreating(false)
   }
@@ -86,8 +66,7 @@ export default function AdminUsers() {
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase()
     if (!query) return users
-    return users.filter(user => [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link]
-      .some(value => String(value || '').toLowerCase().includes(query)))
+    return users.filter(user => [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query)))
   }, [users, search])
 
   if (loading) return <section className="card"><p>Memuat daftar user...</p></section>
@@ -97,15 +76,15 @@ export default function AdminUsers() {
       <div><h2>Manajemen User</h2><p className="muted">Kelola level, status, link, dan password user dari Admin.</p></div>
       <button type="button" onClick={() => { setShowCreate(true); setError(''); setNotice('') }} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',boxShadow:'0 10px 26px rgba(53,211,153,.16)',whiteSpace:'nowrap'}}>＋ Tambah User</button>
     </div>
-    <div className="card admin-user-search">
-      <span className="search-icon" aria-hidden="true">⌕</span>
-      <input aria-label="Cari user" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username, ID, role, level, status, atau link..." />
-      {search && <button type="button" className="search-clear" onClick={() => setSearch('')} aria-label="Hapus pencarian">✕</button>}
-      <span className="search-count">{filteredUsers.length}/{users.length}</span>
+    <div className="card admin-user-search" style={{display:'flex',alignItems:'center',gap:10,marginTop:12,padding:'10px 12px',border:'1px solid var(--border)',borderRadius:14,background:'rgba(17,26,43,.62)',boxShadow:'0 12px 30px rgba(0,0,0,.12)'}}>
+      <span aria-hidden="true" style={{fontSize:20,lineHeight:1,color:'var(--primary)'}}>⌕</span>
+      <input aria-label="Cari user" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username, ID, role, level, status, atau link..." style={{border:0,boxShadow:'none',background:'transparent',padding:'7px 0',flex:1,minWidth:0,outline:'none'}} />
+      {search && <button type="button" onClick={() => setSearch('')} aria-label="Hapus pencarian" style={{padding:'6px 8px',background:'rgba(255,255,255,.05)',color:'#aeb9ca',border:'1px solid var(--border)',borderRadius:8,fontSize:11}}>✕</button>}
+      <span style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap'}}>{filteredUsers.length}/{users.length}</span>
     </div>
     {error && <div className="error card" style={{padding:14,marginTop:12}}>{error}</div>}
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
-    {filteredUsers.length === 0 && <div className="card admin-empty"><strong>{search ? 'User tidak ditemukan' : 'Belum ada user'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Belum ada data user untuk ditampilkan.'}</p></div>}
+    {filteredUsers.length === 0 && <div className="card" style={{padding:20,marginTop:12}}><strong>{search ? 'User tidak ditemukan' : 'Belum ada user'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Belum ada data user untuk ditampilkan.'}</p></div>}
     {filteredUsers.map(user => <article className="card user-row" key={user.id}>
       <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small">{user.id}</p></div>
       <label>Level<select value={user.level || 'free'} disabled={saving === user.id} onChange={e => updateUser(user.id, { level: e.target.value })}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
