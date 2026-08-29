@@ -14,6 +14,7 @@ export default function AdminUsers() {
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   async function loadUsers() {
     setLoading(true)
@@ -65,9 +66,15 @@ export default function AdminUsers() {
   const field = (key, value) => setForm(current => ({ ...current, [key]: value }))
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return users
-    return users.filter(user => [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query)))
-  }, [users, search])
+    return users.filter(user => {
+      const matchesStatus = statusFilter === 'all' || (user.status || 'active').toLowerCase() === statusFilter
+      const matchesSearch = !query || [user.username, user.id, user.role, user.level, user.status, user.exclusive_link, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query))
+      return matchesStatus && matchesSearch
+    })
+  }, [users, search, statusFilter])
+
+  const activeCount = users.filter(user => (user.status || 'active').toLowerCase() === 'active').length
+  const suspendedCount = users.filter(user => (user.status || '').toLowerCase() === 'suspended').length
 
   if (loading) return <section className="card"><p>Memuat daftar user...</p></section>
 
@@ -82,9 +89,14 @@ export default function AdminUsers() {
       {search && <button type="button" onClick={() => setSearch('')} aria-label="Hapus pencarian" style={{padding:'6px 8px',background:'rgba(255,255,255,.05)',color:'#aeb9ca',border:'1px solid var(--border)',borderRadius:8,fontSize:11}}>✕</button>}
       <span style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap'}}>{filteredUsers.length}/{users.length}</span>
     </div>
+    <div className="admin-status-filter" role="group" aria-label="Filter status user" style={{display:'flex',alignItems:'center',gap:7,marginTop:10,overflowX:'auto',paddingBottom:2}}>
+      <button type="button" className={statusFilter === 'all' ? 'status-filter active' : 'status-filter'} onClick={() => setStatusFilter('all')}>Semua <span>{users.length}</span></button>
+      <button type="button" className={statusFilter === 'active' ? 'status-filter active' : 'status-filter'} onClick={() => setStatusFilter('active')}>🟢 Active <span>{activeCount}</span></button>
+      <button type="button" className={statusFilter === 'suspended' ? 'status-filter suspended-active' : 'status-filter'} onClick={() => setStatusFilter('suspended')}>🔴 Suspended <span>{suspendedCount}</span></button>
+    </div>
     {error && <div className="error card" style={{padding:14,marginTop:12}}>{error}</div>}
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
-    {filteredUsers.length === 0 && <div className="card" style={{padding:20,marginTop:12}}><strong>{search ? 'User tidak ditemukan' : 'Belum ada user'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Belum ada data user untuk ditampilkan.'}</p></div>}
+    {filteredUsers.length === 0 && <div className="card" style={{padding:20,marginTop:12}}><strong>{search ? 'User tidak ditemukan' : 'Tidak ada user pada filter ini'}</strong><p className="muted small">{search ? `Tidak ada user yang cocok dengan “${search}”.` : 'Coba pilih filter status lainnya.'}</p></div>}
     {filteredUsers.map(user => <article className="card user-row" key={user.id}>
       <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small">{user.id}</p></div>
       <label>Level<select value={user.level || 'free'} disabled={saving === user.id} onChange={e => updateUser(user.id, { level: e.target.value })}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
