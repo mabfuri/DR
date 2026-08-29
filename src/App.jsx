@@ -51,7 +51,17 @@ function Dashboard({ profile }) {
         <button className="ghost" onClick={logout}>Logout</button>
       </div>
     </header>
-    <section className="hero"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username || 'User'}</h1></section>
+    <section className="hero"><p className="eyebrow">WELCOME BACK</p>
+      <div className="user-balance-row">
+        <div className="user-heading"><h1>{profile?.username || 'User'}</h1><span className="badge">{profile?.level?.toUpperCase() || 'FREE'}</span></div>
+        <div className="balance-card" aria-label="Informasi saldo">
+          <div className="balance-item"><span>Saldo tersedia:</span><strong>Rp0</strong></div>
+          <div className="balance-divider" aria-hidden="true" />
+          <div className="balance-item"><span>Akumulasi saldo:</span><strong>Rp0</strong></div>
+          <button className="withdraw-button" type="button">TARIK SALDO</button>
+        </div>
+      </div>
+    </section>
     <section className="offer card">
       <p className="muted offer-label">OFFER BY</p>
       <h2>{offer.name}</h2>
