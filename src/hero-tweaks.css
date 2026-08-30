@@ -1,6 +1,63 @@
-.hero{padding:0 0 28px}
-.hero .user-heading{align-self:flex-start;position:relative}.hero .eyebrow{margin:0 0 4px;position:relative;top:1px}.offer .offer-by{position:relative;z-index:1;display:flex;align-items:baseline;justify-content:center;gap:7px;white-space:nowrap}.offer .offer-by .offer-label{margin:0;display:inline;font-family:inherit;font-size:28px;font-weight:850;letter-spacing:-.03em;line-height:1.1}.offer .offer-by h2{margin:0;font-family:inherit;font-size:28px;font-weight:850;letter-spacing:-.03em;line-height:1.1;display:inline}
-:root{--bg:#f4f7fb;--surface:#ffffff;--surface-2:#f8fafc;--border:rgba(15,23,42,.10);--text:#172033;--muted:#64748b;--shadow:0 16px 40px rgba(15,23,42,.08)}html,body{background:var(--bg);color:var(--text)}body{background:radial-gradient(circle at 15% 0%,rgba(53,211,153,.10),transparent 32%),radial-gradient(circle at 90% 10%,rgba(242,200,107,.10),transparent 28%),var(--bg)}.card{background:rgba(255,255,255,.94);border-color:var(--border);box-shadow:var(--shadow);backdrop-filter:blur(14px)}.brand{color:#172033}.topbar{background:rgba(255,255,255,.88);border-bottom-color:var(--border);box-shadow:0 4px 18px rgba(15,23,42,.04)}.ghost{background:#fff;color:#334155;border-color:var(--border)}.ghost:hover{background:rgba(53,211,153,.08);border-color:rgba(53,211,153,.28)}.balance-card{background:rgba(255,255,255,.82);border-color:var(--border);box-shadow:0 12px 30px rgba(15,23,42,.06)}.offer-nav button{background:#f8fafc;border-color:var(--border);color:#334155}.offer-nav button:hover{background:rgba(53,211,153,.07);border-color:rgba(53,211,153,.3)}.offer-nav .unlock:disabled{background:#cbd5e1;color:#64748b;box-shadow:none;cursor:not-allowed;transform:none;opacity:1}.performance{background:#f8fafc;border-color:var(--border)}.stat{border-right-color:var(--border)}.admin-tabs{background:#fff;border-color:var(--border);box-shadow:0 12px 30px rgba(15,23,42,.06)}.admin-tab{color:#64748b}.admin-tab:hover{color:#172033;background:#f8fafc}.user-row{background:#fff}input,select{background:#fff;color:var(--text);border-color:var(--border)}input::placeholder{color:#94a3b8}.auth-page{background:radial-gradient(circle at 50% 0%,rgba(53,211,153,.10),transparent 38%),var(--bg)}.auth-card label{color:#334155}.notice{background:rgba(242,200,107,.10);color:#7c641f}
-.dashboard-banner{width:min(970px,calc(100% - 40px));min-height:90px;margin:22px auto 0;position:relative;z-index:1;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 10px 28px rgba(15,23,42,.05)}.dashboard-banner-inner{width:100%;min-height:90px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;font-weight:700;letter-spacing:.12em}.dashboard-banner-inner span{opacity:.7}
-@media(max-width:900px){.hero{padding:0 0 22px}.hero .eyebrow{top:1px}.offer .offer-by{gap:6px}.offer .offer-by .offer-label,.offer .offer-by h2{font-size:25px}.dashboard-banner{width:calc(100% - 40px);min-height:90px}}
-@media(max-width:520px){.hero{padding:0 0 18px}.hero .eyebrow{top:1px}.offer .offer-by{gap:5px}.offer .offer-by .offer-label,.offer .offer-by h2{font-size:22px}.dashboard-banner{width:calc(100% - 24px);min-height:100px}.dashboard-banner-inner{min-height:100px}}
+/* Dashboard balance layout: welcome left, balances side-by-side, withdraw below accumulated balance */
+.hero .user-balance-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.hero .user-heading {
+  display: block;
+  min-width: max-content;
+}
+
+.hero .user-heading .eyebrow {
+  margin: 0 0 4px;
+}
+
+.hero .balance-card {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(170px, 1fr);
+  align-items: start;
+  gap: 24px;
+  flex: 1;
+  max-width: 720px;
+}
+
+.hero .balance-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.hero .balance-item-accumulated {
+  align-items: flex-start;
+}
+
+.hero .withdraw-button {
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
+@media (max-width: 700px) {
+  .hero .user-balance-row {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .hero .balance-card {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .hero .balance-divider {
+    display: none;
+  }
+
+  .hero .balance-item-accumulated {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
