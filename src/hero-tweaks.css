@@ -2,7 +2,7 @@
 .hero .user-heading{align-self:flex-start;position:relative}
 .hero .eyebrow{margin:0 0 4px;position:relative;top:1px}
 .offer .offer-by{position:relative;z-index:1;display:flex;align-items:baseline;justify-content:center;gap:7px;white-space:nowrap}
-.offer .offer-by .offer-label{margin:0;display:inline}
-.offer .offer-by h2{margin:0;font-size:28px;letter-spacing:-.03em;display:inline}
-@media(max-width:900px){.hero{padding:0 0 22px}.hero .eyebrow{top:1px}.offer .offer-by{gap:6px}.offer .offer-by h2{font-size:25px}}
-@media(max-width:520px){.hero{padding:0 0 18px}.hero .eyebrow{top:1px}.offer .offer-by{gap:5px}.offer .offer-by .offer-label{font-size:9px}.offer .offer-by h2{font-size:22px}}
+.offer .offer-by .offer-label{margin:0;display:inline;font-family:inherit;font-size:28px;font-weight:850;letter-spacing:-.03em;line-height:1.1}
+.offer .offer-by h2{margin:0;font-family:inherit;font-size:28px;font-weight:850;letter-spacing:-.03em;line-height:1.1;display:inline}
+@media(max-width:900px){.hero{padding:0 0 22px}.hero .eyebrow{top:1px}.offer .offer-by{gap:6px}.offer .offer-by .offer-label,.offer .offer-by h2{font-size:25px}}
+@media(max-width:520px){.hero{padding:0 0 18px}.hero .eyebrow{top:1px}.offer .offer-by{gap:5px}.offer .offer-by .offer-label,.offer .offer-by h2{font-size:22px}}
