@@ -38,7 +38,7 @@ export default function AdminRewards() {
     setSaving(null)
   }
 
-  return <section className="admin-rewards">
+  return <section className="admin-users admin-rewards">
     <div className="card"><h2>Pengaturan Reward</h2><p className="muted">Atur reward klik UNLOCK berdasarkan level user. FREE dan BASIC tidak mendapatkan saldo.</p></div>
     {error && <div className="error card admin-message">{error}</div>}
     {notice && <div className="success card admin-message">{notice}</div>}
