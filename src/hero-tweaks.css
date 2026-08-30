@@ -4,5 +4,30 @@
 .offer .offer-by{position:relative;z-index:1;display:flex;align-items:baseline;justify-content:center;gap:7px;white-space:nowrap}
 .offer .offer-by .offer-label{margin:0;display:inline;font-family:inherit;font-size:28px;font-weight:850;letter-spacing:-.03em;line-height:1.1}
 .offer .offer-by h2{margin:0;font-family:inherit;font-size:28px;font-weight:850;letter-spacing:-.03em;line-height:1.1;display:inline}
+
+/* Light Premium theme */
+:root{--bg:#f4f7fb;--surface:#ffffff;--surface-2:#f8fafc;--border:rgba(15,23,42,.10);--text:#172033;--muted:#64748b;--shadow:0 16px 40px rgba(15,23,42,.08)}
+html,body{background:var(--bg);color:var(--text)}
+body{background:radial-gradient(circle at 15% 0%,rgba(53,211,153,.10),transparent 32%),radial-gradient(circle at 90% 10%,rgba(242,200,107,.10),transparent 28%),var(--bg)}
+.card{background:rgba(255,255,255,.94);border-color:var(--border);box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+.brand{color:#172033}
+.topbar{background:rgba(255,255,255,.88);border-bottom-color:var(--border);box-shadow:0 4px 18px rgba(15,23,42,.04)}
+.ghost{background:#fff;color:#334155;border-color:var(--border)}
+.ghost:hover{background:rgba(53,211,153,.08);border-color:rgba(53,211,153,.28)}
+.balance-card{background:rgba(255,255,255,.82);border-color:var(--border);box-shadow:0 12px 30px rgba(15,23,42,.06)}
+.offer-nav button{background:#f8fafc;border-color:var(--border);color:#334155}
+.offer-nav button:hover{background:rgba(53,211,153,.07);border-color:rgba(53,211,153,.3)}
+.performance{background:#f8fafc;border-color:var(--border)}
+.stat{border-right-color:var(--border)}
+.admin-tabs{background:#fff;border-color:var(--border);box-shadow:0 12px 30px rgba(15,23,42,.06)}
+.admin-tab{color:#64748b}
+.admin-tab:hover{color:#172033;background:#f8fafc}
+.user-row{background:#fff}
+input,select{background:#fff;color:var(--text);border-color:var(--border)}
+input::placeholder{color:#94a3b8}
+.auth-page{background:radial-gradient(circle at 50% 0%,rgba(53,211,153,.10),transparent 38%),var(--bg)}
+.auth-card label{color:#334155}
+.notice{background:rgba(242,200,107,.10);color:#7c641f}
+
 @media(max-width:900px){.hero{padding:0 0 22px}.hero .eyebrow{top:1px}.offer .offer-by{gap:6px}.offer .offer-by .offer-label,.offer .offer-by h2{font-size:25px}}
 @media(max-width:520px){.hero{padding:0 0 18px}.hero .eyebrow{top:1px}.offer .offer-by{gap:5px}.offer .offer-by .offer-label,.offer .offer-by h2{font-size:22px}}
