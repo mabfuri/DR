@@ -100,7 +100,7 @@ export default function AdminOffers({ users }) {
 
     <div style={{display:'grid',gap:12,marginTop:12}}>
       {loading ? <div className="card"><p>Memuat daftar offer...</p></div> : offers.length === 0 ? <div className="card"><strong>Belum ada offer.</strong><p className="muted small">Buat offer pertama untuk mulai menampilkannya di Dashboard.</p></div> : offers.map(offer => <article className="card" key={offer.id} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:12,alignItems:'center'}}>
-        <div style={{minWidth:0}}><strong>{offer.title}</strong><p className="muted small" style={{margin:'5px 0'}}>OFFER BY <b>{offer.profiles?.username || 'User'}</b> · {offer.status === 'active' ? '🟢 Active' : '⚪ Inactive'} · Urutan {offer.sort_order}</p><a href={offer.link} target="_blank" rel="noreferrer" className="muted small" style={{wordBreak:'break-all'}}>{offer.link}</a></div>
+        <div style={{minWidth:0}}><strong>{offer.title}</strong><p className="muted small" style={{margin:'5px 0',whiteSpace:'nowrap'}}>OFFER BY <b>{offer.profiles?.username || 'User'}</b> · {offer.status === 'active' ? '🟢 Active' : '⚪ Inactive'} · Urutan {offer.sort_order}</p><a href={offer.link} target="_blank" rel="noreferrer" className="muted small" style={{wordBreak:'break-all'}}>{offer.link}</a></div>
         <div style={{display:'flex',gap:7,flexWrap:'wrap',justifyContent:'flex-end'}}><button type="button" onClick={() => startEdit(offer)}>✏️ Edit</button><button type="button" onClick={() => toggleStatus(offer)}>{offer.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}</button><button type="button" onClick={() => deleteOffer(offer)} style={{background:'rgba(239,68,68,.12)',color:'#fecaca'}}>🗑️ Hapus</button></div>
       </article>)}
     </div>
