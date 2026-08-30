@@ -17,6 +17,7 @@ body{background:radial-gradient(circle at 15% 0%,rgba(53,211,153,.10),transparen
 .balance-card{background:rgba(255,255,255,.82);border-color:var(--border);box-shadow:0 12px 30px rgba(15,23,42,.06)}
 .offer-nav button{background:#f8fafc;border-color:var(--border);color:#334155}
 .offer-nav button:hover{background:rgba(53,211,153,.07);border-color:rgba(53,211,153,.3)}
+.offer-nav .unlock:disabled{background:#cbd5e1;color:#64748b;box-shadow:none;cursor:not-allowed;transform:none;opacity:1}
 .performance{background:#f8fafc;border-color:var(--border)}
 .stat{border-right-color:var(--border)}
 .admin-tabs{background:#fff;border-color:var(--border);box-shadow:0 12px 30px rgba(15,23,42,.06)}
