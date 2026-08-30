@@ -1,4 +1,5 @@
 .hero{padding:0 0 28px}
-.hero .eyebrow{margin-top:0}
-@media(max-width:900px){.hero{padding:0 0 22px}}
-@media(max-width:520px){.hero{padding:0 0 18px}}
+.hero .eyebrow{margin-top:-8px}
+.hero .user-heading{align-self:flex-start}
+@media(max-width:900px){.hero{padding:0 0 22px}.hero .eyebrow{margin-top:-6px}}
+@media(max-width:520px){.hero{padding:0 0 18px}.hero .eyebrow{margin-top:-4px}}
