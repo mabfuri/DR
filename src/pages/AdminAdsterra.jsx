@@ -26,7 +26,6 @@ export default function AdminAdsterra() {
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(null)
   const [loadingStats, setLoadingStats] = useState(null)
   const [stats, setStats] = useState({})
   const [error, setError] = useState('')
@@ -44,21 +43,6 @@ export default function AdminAdsterra() {
   }
 
   useEffect(() => { loadUsers() }, [])
-
-  async function saveAdsterra(user) {
-    setSaving(user.id); setError(''); setNotice('')
-    const placement = String(user.adsterra_placement_id || '').trim()
-    if (placement && !/^\d+$/.test(placement)) { setError('Placement ID harus berupa angka.'); setSaving(null); return }
-    const { error: updateError } = await supabase.from('profiles').update({
-      adsterra_placement_id: placement || null
-    }).eq('id', user.id)
-    if (updateError) setError(updateError.message)
-    else {
-      setUsers(list => list.map(item => item.id === user.id ? { ...item, adsterra_placement_id: placement } : item))
-      setNotice(`Konfigurasi Adsterra ${user.username || 'user'} berhasil disimpan.`)
-    }
-    setSaving(null)
-  }
 
   async function loadStats(user) {
     const placement = String(user.adsterra_placement_id || '').trim()
@@ -108,10 +92,9 @@ export default function AdminAdsterra() {
       {filtered.map(user => {
         const metric = stats[user.id]
         return <article className="card" key={user.id} style={{display:'grid',gap:12}}>
-          <div style={{display:'grid',gridTemplateColumns:'minmax(150px,1fr) minmax(150px,220px) auto',gap:12,alignItems:'end'}}>
-            <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small" style={{margin:'4px 0 0'}}>{user.status || 'active'} • {(user.level || 'free').toUpperCase()}</p></div>
-            <label>Placement ID<input inputMode="numeric" value={user.adsterra_placement_id || ''} onChange={e => setUsers(list => list.map(item => item.id === user.id ? { ...item, adsterra_placement_id: e.target.value.replace(/[^0-9]/g, '') } : item))} placeholder="Contoh: 30659021" /></label>
-            <div style={{display:'flex',gap:8}}><button type="button" disabled={saving === user.id} onClick={() => saveAdsterra(user)}>{saving === user.id ? 'MENYIMPAN...' : 'Simpan'}</button><button type="button" className="ghost" disabled={loadingStats === user.id || !user.adsterra_placement_id} onClick={() => loadStats(user)}>{loadingStats === user.id ? 'MEMUAT...' : 'Statistik'}</button></div>
+          <div style={{display:'grid',gridTemplateColumns:'minmax(180px,1fr) auto',gap:12,alignItems:'center'}}>
+            <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small" style={{margin:'4px 0 0'}}>{user.status || 'active'} • {(user.level || 'free').toUpperCase()} • Placement ID: {user.adsterra_placement_id || 'Belum diatur'}</p></div>
+            <button type="button" className="ghost" disabled={loadingStats === user.id || !user.adsterra_placement_id} onClick={() => loadStats(user)}>{loadingStats === user.id ? 'MEMUAT...' : 'Statistik'}</button>
           </div>
           {metric && <div style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:8}}>
             <div className="card"><span className="muted small">Impressions</span><strong>{metric.impressions.toLocaleString('id-ID')}</strong></div>
