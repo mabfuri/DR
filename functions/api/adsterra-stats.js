@@ -18,6 +18,13 @@ function normalizeApiKey(value) {
   return key
 }
 
+function clampDateRange(startDate, finishDate) {
+  const start = new Date(`${startDate}T00:00:00Z`)
+  const finish = new Date(`${finishDate}T00:00:00Z`)
+  const maxStart = new Date(finish.getTime() - 365 * 24 * 60 * 60 * 1000)
+  return start < maxStart ? maxStart.toISOString().slice(0, 10) : startDate
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context
 
@@ -69,13 +76,17 @@ export async function onRequestGet(context) {
 
   const placement = url.searchParams.get('placement')?.trim() || ''
   const domain = url.searchParams.get('domain')?.trim() || ''
-  const startDate = url.searchParams.get('start_date')?.trim() || '2020-01-01'
+  const requestedStartDate = url.searchParams.get('start_date')?.trim() || '2020-01-01'
   const finishDate = url.searchParams.get('finish_date')?.trim() || new Date().toISOString().slice(0, 10)
 
   if (!domain || !/^\d+$/.test(domain)) return json({ error: 'Domain ID tidak valid.' }, 400)
   if (!placement || !/^\d+$/.test(placement)) return json({ error: 'Placement ID tidak valid.' }, 400)
-  if (!isDate(startDate) || !isDate(finishDate)) return json({ error: 'Format tanggal harus YYYY-MM-DD.' }, 400)
-  if (startDate > finishDate) return json({ error: 'Tanggal mulai tidak boleh setelah tanggal akhir.' }, 400)
+  if (!isDate(requestedStartDate) || !isDate(finishDate)) return json({ error: 'Format tanggal harus YYYY-MM-DD.' }, 400)
+  if (requestedStartDate > finishDate) return json({ error: 'Tanggal mulai tidak boleh setelah tanggal akhir.' }, 400)
+
+  // Adsterra allows a maximum range of 366 calendar days (inclusive).
+  // Automatically clamp older requests so the API never receives a range > 366 days.
+  const startDate = clampDateRange(requestedStartDate, finishDate)
 
   const params = new URLSearchParams({
     domain,
