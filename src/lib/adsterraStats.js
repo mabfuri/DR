@@ -21,9 +21,14 @@ export async function getAdsterraStats({ placement, domain = '', startDate = '20
     }
   }
 
+  const { data: activeOffers, error: offerError } = await supabase.rpc('get_active_offers_for_dashboard')
+  if (offerError) throw new Error(`Gagal membaca offer aktif: ${offerError.message}`)
+  const activeOffer = Array.isArray(activeOffers) ? activeOffers[0] : activeOffers
+  const activePlacement = String(activeOffer?.adsterra_placement_id || '').trim()
+  if (!activePlacement) throw new Error('Placement ID offer aktif belum diatur.')
+
   const params = new URLSearchParams()
-  if (placement) params.set('placement', String(placement))
-  if (domain) params.set('domain', String(domain))
+  params.set('placement', activePlacement)
   params.set('start_date', startDate)
   params.set('finish_date', finishDate || new Date().toISOString().slice(0, 10))
   params.set('group_by', 'placement')
@@ -54,5 +59,5 @@ export async function getAdsterraStats({ placement, domain = '', startDate = '20
   const ctr = totals.impressions ? (totals.clicks / totals.impressions) * 100 : 0
   const cpm = totals.impressions ? (totals.revenue / totals.impressions) * 1000 : 0
 
-  return { impressions: totals.impressions, clicks: totals.clicks, ctr, cpm, revenue: totals.revenue, raw: data }
+  return { impressions: totals.impressions, clicks: totals.clicks, ctr, cpm, revenue: totals.revenue, offerId: activeOffer?.id, raw: data }
 }
