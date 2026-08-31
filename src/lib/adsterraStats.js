@@ -1,11 +1,15 @@
 import { supabase } from './supabase'
 
-export async function getAdsterraStats({ placement, domain = '', startDate = '2020-01-01', finishDate } = {}) {
+export async function getAdsterraStats({ offerId, placement, domain = '', startDate = '2020-01-01', finishDate } = {}) {
+  const normalizedOfferId = String(offerId || '').trim()
+  const normalizedPlacement = String(placement || '').trim()
+  if (!normalizedOfferId) throw new Error('Offer aktif tidak ditemukan.')
+  if (!normalizedPlacement) throw new Error('Placement ID offer aktif belum diatur.')
+
   const { data: cached, error: cacheError } = await supabase
     .from('offer_adsterra_stats_cache')
     .select('impressions,clicks,ctr,cpm,revenue,updated_at,offer_id')
-    .order('updated_at', { ascending: false })
-    .limit(1)
+    .eq('offer_id', normalizedOfferId)
     .maybeSingle()
 
   if (!cacheError && cached) {
@@ -21,14 +25,9 @@ export async function getAdsterraStats({ placement, domain = '', startDate = '20
     }
   }
 
-  const { data: activeOffers, error: offerError } = await supabase.rpc('get_active_offers_for_dashboard')
-  if (offerError) throw new Error(`Gagal membaca offer aktif: ${offerError.message}`)
-  const activeOffer = Array.isArray(activeOffers) ? activeOffers[0] : activeOffers
-  const activePlacement = String(activeOffer?.adsterra_placement_id || '').trim()
-  if (!activePlacement) throw new Error('Placement ID offer aktif belum diatur.')
-
   const params = new URLSearchParams()
-  params.set('placement', activePlacement)
+  params.set('placement', normalizedPlacement)
+  if (domain) params.set('domain', domain)
   params.set('start_date', startDate)
   params.set('finish_date', finishDate || new Date().toISOString().slice(0, 10))
   params.set('group_by', 'placement')
@@ -59,5 +58,5 @@ export async function getAdsterraStats({ placement, domain = '', startDate = '20
   const ctr = totals.impressions ? (totals.clicks / totals.impressions) * 100 : 0
   const cpm = totals.impressions ? (totals.revenue / totals.impressions) * 1000 : 0
 
-  return { impressions: totals.impressions, clicks: totals.clicks, ctr, cpm, revenue: totals.revenue, offerId: activeOffer?.id, raw: data }
+  return { impressions: totals.impressions, clicks: totals.clicks, ctr, cpm, revenue: totals.revenue, offerId: normalizedOfferId, raw: data }
 }
