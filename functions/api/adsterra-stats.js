@@ -10,13 +10,23 @@ function isDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
 }
 
+function normalizeApiKey(value) {
+  let key = String(value || '').trim()
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1).trim()
+  }
+  return key
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context
 
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     return json({ error: 'Supabase server configuration belum lengkap.' }, 500)
   }
-  if (!env.ADSTERRA_API_KEY) {
+
+  const apiKey = normalizeApiKey(env.ADSTERRA_API_KEY)
+  if (!apiKey) {
     return json({ error: 'ADSTERRA_API_KEY belum dikonfigurasi di Cloudflare Preview/Production.' }, 500)
   }
 
@@ -48,12 +58,13 @@ export async function onRequestGet(context) {
   if (!isDate(startDate) || !isDate(finishDate)) return json({ error: 'Format tanggal harus YYYY-MM-DD.' }, 400)
   if (startDate > finishDate) return json({ error: 'Tanggal mulai tidak boleh setelah tanggal akhir.' }, 400)
 
-  const params = new URLSearchParams()
-  params.set('domain', domain)
-  params.set('placement', placement)
-  params.set('start_date', startDate)
-  params.set('finish_date', finishDate)
-  params.set('group_by', 'placement')
+  const params = new URLSearchParams({
+    domain,
+    placement,
+    start_date: startDate,
+    finish_date: finishDate,
+    group_by: 'placement'
+  })
 
   const apiUrl = `https://api3.adsterratools.com/publisher/stats.json?${params.toString()}`
   let response
@@ -62,7 +73,7 @@ export async function onRequestGet(context) {
       method: 'GET',
       headers: {
         Accept: 'application/json',
-        'X-API-Key': env.ADSTERRA_API_KEY
+        'X-API-Key': apiKey
       }
     })
   } catch (error) {
@@ -81,12 +92,5 @@ export async function onRequestGet(context) {
     }, response.status === 401 || response.status === 403 ? 502 : response.status)
   }
 
-  return json({
-    ok: true,
-    placement,
-    domain,
-    start_date: startDate,
-    finish_date: finishDate,
-    data
-  })
+  return json({ ok: true, placement, domain, start_date: startDate, finish_date: finishDate, data })
 }
