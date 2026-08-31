@@ -11,7 +11,7 @@ export default function AdminWithdrawals() {
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    let query = supabase.from('withdrawals').select('id,user_id,amount,payment_method,payment_account,status,created_at').order('created_at', { ascending: false }).limit(100)
+    let query = supabase.from('withdrawals').select('id,user_id,amount,payment_method,payment_account,beneficiary_name,status,created_at').order('created_at', { ascending: false }).limit(100)
     if (status !== 'all') query = query.eq('status', status)
     const { data, error: queryError } = await query
     if (queryError) { setError(queryError.message); setWithdrawals([]); setLoading(false); return }
@@ -58,6 +58,7 @@ export default function AdminWithdrawals() {
       <div><strong>{w.profile?.username || w.user_id}</strong><p className="muted small">{w.profile?.level?.toUpperCase() || 'USER'} • {new Date(w.created_at).toLocaleString('id-ID')}</p></div>
       <div><label>Nominal<input readOnly value={`Rp${Number(w.amount).toLocaleString('id-ID')}`} /></label></div>
       <div><label>Pembayaran<input readOnly value={`${w.payment_method} • ${w.payment_account}`} /></label></div>
+      <div><label>Atas Nama<input readOnly value={w.beneficiary_name || '-'} /></label></div>
       <div><label>Status<input readOnly value={String(w.status).toUpperCase()} /></label></div>
       {w.status === 'pending' && <div><button type="button" onClick={() => approve(w.id)} disabled={busyId === w.id}>{busyId === w.id ? 'MEMPROSES...' : '✓ APPROVE'}</button><button type="button" onClick={() => reject(w.id)} disabled={busyId === w.id}>✕ REJECT</button></div>}
     </div>)}
