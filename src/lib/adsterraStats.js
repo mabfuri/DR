@@ -1,6 +1,26 @@
 import { supabase } from './supabase'
 
 export async function getAdsterraStats({ placement, domain = '', startDate = '2020-01-01', finishDate } = {}) {
+  const { data: cached, error: cacheError } = await supabase
+    .from('offer_adsterra_stats_cache')
+    .select('impressions,clicks,ctr,cpm,revenue,updated_at,offer_id')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!cacheError && cached) {
+    return {
+      impressions: Number(cached.impressions || 0),
+      clicks: Number(cached.clicks || 0),
+      ctr: Number(cached.ctr || 0),
+      cpm: Number(cached.cpm || 0),
+      revenue: Number(cached.revenue || 0),
+      offerId: cached.offer_id,
+      updatedAt: cached.updated_at,
+      raw: { source: 'offer_adsterra_stats_cache' },
+    }
+  }
+
   const params = new URLSearchParams()
   if (placement) params.set('placement', String(placement))
   if (domain) params.set('domain', String(domain))
