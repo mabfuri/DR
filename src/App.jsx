@@ -10,6 +10,7 @@ import History from './pages/History'
 import ProtectedRoute from './components/ProtectedRoute'
 import './hero-tweaks.css'
 import './withdrawal.css'
+import './pages/user-dashboard-premium.css'
 
 function ConfigNotice() { return <main className="auth-page"><section className="card auth-card"><div className="brand">DollarRise</div><h1>Konfigurasi belum lengkap</h1><p className="muted">Aplikasi berhasil dimuat, tetapi Supabase belum terhubung.</p><div className="notice"><strong>Yang diperlukan:</strong><br />VITE_SUPABASE_URL<br />VITE_SUPABASE_ANON_KEY</div><p className="muted small">Tambahkan kedua Environment Variable tersebut di Cloudflare Pages, lalu lakukan redeploy.</p></section></main> }
 
