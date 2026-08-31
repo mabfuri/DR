@@ -20,6 +20,19 @@ function Dashboard({ profile }) {
   const [rewardNotice, setRewardNotice] = useState('')
   const [rewarding, setRewarding] = useState(false)
   const [limitedOffers, setLimitedOffers] = useState({})
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [paymentAccount, setPaymentAccount] = useState('')
+  const [withdrawNotice, setWithdrawNotice] = useState('')
+  const [withdrawError, setWithdrawError] = useState('')
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [withdrawals, setWithdrawals] = useState([])
+
+  async function loadWithdrawals() {
+    const { data } = await supabase.from('withdrawals').select('id,amount,payment_method,payment_account,status,created_at').eq('user_id', profile.id).order('created_at',{ascending:false}).limit(10)
+    setWithdrawals(data || [])
+  }
 
   useEffect(() => {
     let mounted = true
@@ -40,11 +53,11 @@ function Dashboard({ profile }) {
           if (error) setOfferError(error.message)
           else offerRows = (data || []).map(item => ({ ...item, owner_username: ownerRows.find(row => row.offer_id === item.id)?.owner_username || '' }))
         }
-        setOffers(offerRows)
-        setIndex(0)
+        setOffers(offerRows); setIndex(0)
       }
       if (!balanceErr) setBalance(Number(balanceData?.balance || 0))
       if (!txErr) setAccumulated((txData || []).reduce((sum,r) => sum + Number(r.amount || 0), 0))
+      await loadWithdrawals()
     }
     load()
     return () => { mounted = false }
@@ -59,32 +72,39 @@ function Dashboard({ profile }) {
     setRewarding(true); setRewardNotice('')
     const { data, error } = await supabase.rpc('claim_offer_reward', { p_offer_id: offer.id })
     if (error) {
-      if (error.message?.includes('maximum 10 clicks per hour for this offer')) {
-        setLimitedOffers(prev => ({ ...prev, [offer.id]: true }))
-        setRewardNotice('Limit klik offer telah tercapai.')
-      } else if (error.message?.includes('maximum 10 clicks per day for this offer')) {
-        setLimitedOffers(prev => ({ ...prev, [offer.id]: true }))
-        setRewardNotice('Limit klik offer hari ini telah tercapai.')
-      } else {
-        setRewardNotice(error.message)
-      }
+      if (error.message?.includes('maximum 10 clicks per hour for this offer') || error.message?.includes('maximum 10 clicks per day for this offer')) {
+        setLimitedOffers(prev => ({ ...prev, [offer.id]: true })); setRewardNotice('Limit klik offer telah tercapai.')
+      } else setRewardNotice(error.message)
     } else {
       const result = Array.isArray(data) ? data[0] : data
-      if (result?.rewarded) {
-        setBalance(Number(result.new_balance || 0))
-        setAccumulated(v => v + Number(result.reward_amount || 0))
-        setRewardNotice(`Reward ${Number(result.reward_amount || 0).toLocaleString('id-ID')} berhasil ditambahkan ke saldo.`)
-      } else if (Number(result?.daily_limit || 0) === 0) setRewardNotice('Level Anda tidak mendapatkan reward klik.')
+      if (result?.rewarded) { setBalance(Number(result.new_balance || 0)); setAccumulated(v => v + Number(result.reward_amount || 0)); setRewardNotice(`Reward ${Number(result.reward_amount || 0).toLocaleString('id-ID')} berhasil ditambahkan ke saldo.`) }
+      else if (Number(result?.daily_limit || 0) === 0) setRewardNotice('Level Anda tidak mendapatkan reward klik.')
       else setRewardNotice(`Batas reward hari ini telah tercapai: Rp${Number(result?.daily_limit || 0).toLocaleString('id-ID')}.`)
     }
     setRewarding(false)
     if (!offerLimited) window.open(offer.link, '_blank', 'noopener,noreferrer')
   }
 
+  async function submitWithdrawal(e) {
+    e.preventDefault(); setWithdrawError(''); setWithdrawNotice('')
+    const amount = Number(String(withdrawAmount).replace(/[^0-9]/g,''))
+    if (!Number.isFinite(amount) || amount < 50000) { setWithdrawError('Minimal penarikan adalah Rp50.000.'); return }
+    if (amount > balance) { setWithdrawError('Saldo tidak mencukupi.'); return }
+    if (!paymentMethod || !paymentAccount.trim()) { setWithdrawError('Metode pembayaran dan nomor akun wajib diisi.'); return }
+    setWithdrawing(true)
+    const { error } = await supabase.rpc('request_withdrawal', { p_amount: amount, p_payment_method: paymentMethod, p_payment_account: paymentAccount.trim() })
+    if (error) setWithdrawError(error.message)
+    else {
+      setBalance(v => v - amount); setWithdrawAmount(''); setPaymentMethod(''); setPaymentAccount(''); setWithdrawNotice('Penarikan berhasil diajukan dan menunggu pemeriksaan Admin.'); await loadWithdrawals()
+    }
+    setWithdrawing(false)
+  }
+
   async function logout() { await signOut(); navigate('/login',{replace:true}) }
   const stats = [['Impressions','0'],['Clicks','0'],['CTR','0'],['CPM','0'],['Revenue','Rp0']]
   return <main className="dashboard"><header className="topbar"><div className="brand">DollarRise</div><div><span className="badge">{profile?.level?.toUpperCase() || 'FREE'}</span>{profile?.role === 'admin' && <button className="ghost" onClick={() => navigate('/admin')}>Akses Admin</button>}<button className="ghost" onClick={logout}>Logout</button></div></header>
-    <section className="hero"><div className="user-balance-row"><div className="user-heading"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username || 'User'}</h1></div><div className="balance-card" aria-label="Informasi saldo"><div className="balance-item"><span>Saldo Tersedia</span><strong>Rp{balance.toLocaleString('id-ID')}</strong></div><div className="balance-divider" aria-hidden="true"/><div className="balance-item balance-item-accumulated"><span>Akumulasi Saldo</span><strong>Rp{accumulated.toLocaleString('id-ID')}</strong><button className="withdraw-button" type="button">TARIK SALDO</button></div></div></div></section>
+    <section className="hero"><div className="user-balance-row"><div className="user-heading"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username || 'User'}</h1></div><div className="balance-card" aria-label="Informasi saldo"><div className="balance-item"><span>Saldo Tersedia</span><strong>Rp{balance.toLocaleString('id-ID')}</strong></div><div className="balance-divider" aria-hidden="true"/><div className="balance-item balance-item-accumulated"><span>Akumulasi Saldo</span><strong>Rp{accumulated.toLocaleString('id-ID')}</strong><button className="withdraw-button" type="button" onClick={() => { setWithdrawOpen(true); setWithdrawError(''); setWithdrawNotice('') }}>TARIK SALDO</button></div></div></div></section>
+    {withdrawOpen && <section className="withdraw-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setWithdrawOpen(false) }}><div className="card withdraw-modal" role="dialog" aria-modal="true" aria-labelledby="withdraw-title"><div className="withdraw-head"><div><p className="eyebrow">WITHDRAWAL</p><h2 id="withdraw-title">Tarik Saldo</h2></div><button className="ghost" type="button" onClick={() => setWithdrawOpen(false)}>Tutup</button></div><p className="muted small">Saldo tersedia: <strong>Rp{balance.toLocaleString('id-ID')}</strong></p><form onSubmit={submitWithdrawal} className="withdraw-form"><label>Nominal Penarikan<input inputMode="numeric" min="50000" step="1000" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value.replace(/[^0-9]/g,''))} placeholder="Minimal Rp50.000" /></label><label>Metode Pembayaran<select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}><option value="">Pilih metode</option><option value="DANA">DANA</option><option value="OVO">OVO</option><option value="GoPay">GoPay</option><option value="Bank Transfer">Bank Transfer</option></select></label><label>Nomor Rekening / Akun<input value={paymentAccount} onChange={e => setPaymentAccount(e.target.value)} placeholder="Masukkan nomor rekening atau akun" /></label>{withdrawError && <p className="error small">{withdrawError}</p>}{withdrawNotice && <p className="success small">{withdrawNotice}</p>}<button type="submit" className="unlock" disabled={withdrawing}>{withdrawing ? 'MEMPROSES...' : 'AJUKAN PENARIKAN'}</button></form>{withdrawals.length > 0 && <div className="withdraw-history"><h3>Riwayat Penarikan</h3>{withdrawals.map(w => <div className="withdraw-row" key={w.id}><div><strong>Rp{Number(w.amount).toLocaleString('id-ID')}</strong><span>{w.payment_method} • {w.payment_account}</span></div><span className={`withdraw-status status-${String(w.status).toLowerCase()}`}>{String(w.status).toUpperCase()}</span></div>)}</div>}</div></section>}
     <section className="offer card"><div className="offer-by"><span className="muted offer-label">OFFER BY</span><h2>{offer ? (offer.owner_username || 'Nama tidak tersedia') : 'Belum ada offer aktif'}</h2></div>{offer && <p className="muted small" style={{marginTop:-8}}>{offer.title}</p>}{offerError && <p className="error small">{offerError}</p>}{rewardNotice && <p className="muted small">{rewardNotice}</p>}<div className="offer-nav"><button className="offer-prev" disabled={offers.length < 2} onClick={() => move(-1)}>← PREVIOUS OFFER</button>{offer ? <button className="unlock" disabled={rewarding || offerLimited} aria-disabled={rewarding || offerLimited} onClick={unlockOffer}>🔒 {rewarding ? 'MEMPROSES...' : offerLimited ? 'LIMIT TERCAPAI' : 'UNLOCK EXCLUSIVE ACCESS'}</button> : <span className="unlock" aria-disabled="true">🔒 BELUM TERSEDIA</span>}<button className="offer-next" disabled={offers.length < 2} onClick={() => move(1)}>NEXT OFFER →</button></div><div className="performance">{stats.map(([label,value]) => <div className="stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></section>
   </main>
 }
