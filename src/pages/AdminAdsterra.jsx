@@ -22,6 +22,8 @@ function summarize(payload) {
   return { impressions, clicks, ctr, cpm, revenue }
 }
 
+const emptyMetric = { impressions: 0, clicks: 0, ctr: 0, cpm: 0, revenue: 0 }
+
 export default function AdminAdsterra() {
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
@@ -92,19 +94,20 @@ export default function AdminAdsterra() {
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
     <div style={{display:'grid',gap:10,marginTop:12}}>
       {filtered.map(user => {
-        const metric = stats[user.id]
+        const metric = stats[user.id] || emptyMetric
         return <article className="card" key={user.id} style={{display:'grid',gap:12}}>
           <div style={{display:'grid',gridTemplateColumns:'minmax(180px,1fr) auto',gap:12,alignItems:'center'}}>
             <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small" style={{margin:'4px 0 0'}}>{user.status || 'active'} • {(user.level || 'free').toUpperCase()} • Placement ID: {user.adsterra_placement_id || 'Belum diatur'}</p></div>
             <button type="button" className="ghost" disabled={loadingStats === user.id || !user.adsterra_placement_id} onClick={() => loadStats(user)}>{loadingStats === user.id ? 'MEMUAT...' : 'Statistik'}</button>
           </div>
-          {metric && <div style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:8}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:8}}>
             <div className="card"><span className="muted small">Impressions</span><strong>{metric.impressions.toLocaleString('id-ID')}</strong></div>
             <div className="card"><span className="muted small">Clicks</span><strong>{metric.clicks.toLocaleString('id-ID')}</strong></div>
             <div className="card"><span className="muted small">CTR</span><strong>{metric.ctr.toFixed(2)}%</strong></div>
             <div className="card"><span className="muted small">CPM</span><strong>${metric.cpm.toFixed(3)}</strong></div>
             <div className="card"><span className="muted small">Revenue</span><strong>${metric.revenue.toFixed(2)}</strong></div>
-          </div>}
+          </div>
+          {stats[user.id]?.updated_at && <span className="muted small">Diperbarui: {new Date(stats[user.id].updated_at).toLocaleString('id-ID')}</span>}
         </article>
       })}
     </div>
