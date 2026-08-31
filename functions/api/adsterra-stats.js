@@ -43,17 +43,17 @@ export async function onRequestGet(context) {
   const startDate = url.searchParams.get('start_date')?.trim() || '2020-01-01'
   const finishDate = url.searchParams.get('finish_date')?.trim() || new Date().toISOString().slice(0, 10)
 
+  if (!domain || !/^\d+$/.test(domain)) return json({ error: 'Domain ID tidak valid.' }, 400)
   if (!placement || !/^\d+$/.test(placement)) return json({ error: 'Placement ID tidak valid.' }, 400)
   if (!isDate(startDate) || !isDate(finishDate)) return json({ error: 'Format tanggal harus YYYY-MM-DD.' }, 400)
   if (startDate > finishDate) return json({ error: 'Tanggal mulai tidak boleh setelah tanggal akhir.' }, 400)
 
-  const params = new URLSearchParams({
-    placement,
-    start_date: startDate,
-    finish_date: finishDate,
-    'group_by[]': 'placement'
-  })
-  if (domain && /^\d+$/.test(domain)) params.set('domain', domain)
+  const params = new URLSearchParams()
+  params.set('domain', domain)
+  params.set('placement', placement)
+  params.set('start_date', startDate)
+  params.set('finish_date', finishDate)
+  params.set('group_by', 'placement')
 
   const apiUrl = `https://api3.adsterratools.com/publisher/stats.json?${params.toString()}`
   let response
@@ -84,7 +84,7 @@ export async function onRequestGet(context) {
   return json({
     ok: true,
     placement,
-    domain: domain || null,
+    domain,
     start_date: startDate,
     finish_date: finishDate,
     data
