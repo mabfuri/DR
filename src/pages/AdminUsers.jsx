@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const emptyForm = { username: '', email: '', password: '', role: 'user', level: 'free', status: 'active', dashboardLink: '' }
+const emptyForm = { username: '', email: '', password: '', role: 'user', level: 'free', status: 'active', dashboardLink: '', adsterraPlacementId: '' }
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
@@ -22,7 +22,7 @@ export default function AdminUsers() {
 
   async function loadUsers() {
     setLoading(true)
-    const { data, error: loadError } = await supabase.from('profiles').select('id,username,role,level,status,personal_dashboard_link,created_at').order('created_at', { ascending: false })
+    const { data, error: loadError } = await supabase.from('profiles').select('id,username,role,level,status,personal_dashboard_link,adsterra_placement_id,created_at').order('created_at', { ascending: false })
     if (loadError) setError(loadError.message)
     else setUsers(data || [])
     setLoading(false)
@@ -39,7 +39,7 @@ export default function AdminUsers() {
 
   function openEdit(user) {
     setEditingUser(user)
-    setEditForm({ username: user.username || '', role: user.role || 'user', level: user.level || 'free', status: user.status || 'active', dashboardLink: user.personal_dashboard_link || '' })
+    setEditForm({ username: user.username || '', role: user.role || 'user', level: user.level || 'free', status: user.status || 'active', dashboardLink: user.personal_dashboard_link || '', adsterraPlacementId: user.adsterra_placement_id || '' })
     setError(''); setNotice('')
   }
 
@@ -55,7 +55,7 @@ export default function AdminUsers() {
     const username = editForm.username.trim()
     if (!username) { setError('Username wajib diisi.'); return }
     setSavingEdit(true); setError(''); setNotice('')
-    const patch = { username, role: editForm.role, level: editForm.level, status: editForm.status, personal_dashboard_link: editForm.dashboardLink.trim() || null }
+    const patch = { username, role: editForm.role, level: editForm.level, status: editForm.status, personal_dashboard_link: editForm.dashboardLink.trim() || null, adsterra_placement_id: editForm.adsterraPlacementId.trim() || null }
     const { error: updateError } = await supabase.from('profiles').update(patch).eq('id', editingUser.id)
     if (updateError) setError(updateError.message)
     else {
@@ -103,7 +103,7 @@ export default function AdminUsers() {
       const normalizedLevel = (user.level || 'free').toLowerCase()
       const matchesStatus = statusFilter === 'all' || (user.status || 'active').toLowerCase() === statusFilter
       const matchesLevel = levelFilter === 'all' || (levelFilter === 'member' ? ['member', 'free', 'basic', 'premium'].includes(normalizedLevel) : normalizedLevel === levelFilter)
-      const matchesSearch = !query || [user.username, user.id, user.role, user.level, user.status, user.personal_dashboard_link].some(value => String(value || '').toLowerCase().includes(query))
+      const matchesSearch = !query || [user.username, user.id, user.role, user.level, user.status, user.personal_dashboard_link, user.adsterra_placement_id].some(value => String(value || '').toLowerCase().includes(query))
       return matchesStatus && matchesLevel && matchesSearch
     })
   }, [users, search, statusFilter, levelFilter])
@@ -117,7 +117,7 @@ export default function AdminUsers() {
 
   return <section className="admin-users">
     <div className="card" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
-      <div><h2>Manajemen User</h2><p className="muted">Kelola level, status, link, dan password user dari Admin.</p></div>
+      <div><h2>Manajemen User</h2><p className="muted">Kelola level, status, link, Placement ID, dan password user dari Admin.</p></div>
       <button type="button" onClick={() => { setShowCreate(true); setError(''); setNotice('') }} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',boxShadow:'0 10px 26px rgba(53,211,153,.16)',whiteSpace:'nowrap'}}>＋ Tambah User</button>
     </div>
 
@@ -130,7 +130,7 @@ export default function AdminUsers() {
 
     <div className="card admin-user-search" style={{display:'flex',alignItems:'center',gap:10,marginTop:12,padding:'10px 12px',border:'1px solid var(--border)',borderRadius:14,background:'rgba(17,26,43,.62)',boxShadow:'0 12px 30px rgba(0,0,0,.12)'}}>
       <span aria-hidden="true" style={{fontSize:20,lineHeight:1,color:'var(--primary)'}}>⌕</span>
-      <input aria-label="Cari user" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username, ID, role, level, status, atau link..." style={{border:0,boxShadow:'none',background:'transparent',padding:'7px 0',flex:1,minWidth:0,outline:'none'}} />
+      <input aria-label="Cari user" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username, ID, role, level, status, link, atau Placement ID..." style={{border:0,boxShadow:'none',background:'transparent',padding:'7px 0',flex:1,minWidth:0,outline:'none'}} />
       {search && <button type="button" onClick={() => setSearch('')} aria-label="Hapus pencarian" style={{padding:'6px 8px',background:'rgba(255,255,255,.05)',color:'#aeb9ca',border:'1px solid var(--border)',borderRadius:8,fontSize:11}}>✕</button>}
       <span style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap'}}>{filteredUsers.length}/{users.length}</span>
     </div>
@@ -170,6 +170,7 @@ export default function AdminUsers() {
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Level<select value={editForm.level} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,level:e.target.value}))}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Status<select value={editForm.status} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,status:e.target.value}))}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Dashboard Link<input type="url" value={editForm.dashboardLink} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,dashboardLink:e.target.value}))} placeholder="https://..." /></label>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Adsterra Placement ID<input inputMode="numeric" pattern="[0-9]+" value={editForm.adsterraPlacementId} disabled={savingEdit} onChange={e => setEditForm(v => ({...v,adsterraPlacementId:e.target.value.replace(/[^0-9]/g,'')}))} placeholder="Contoh: 30659021" /></label>
         </div>
         <div style={{display:'flex',justifyContent:'flex-end',gap:9,marginTop:20}}><button type="button" className="ghost" disabled={savingEdit} onClick={closeEdit}>Batal</button><button type="submit" disabled={savingEdit} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',minWidth:155}}>{savingEdit ? 'Menyimpan...' : '✓ Simpan Perubahan'}</button></div>
       </form>
@@ -186,6 +187,7 @@ export default function AdminUsers() {
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Level<select value={form.level} disabled={creating} onChange={e => field('level',e.target.value)}><option value="free">Free</option><option value="basic">Basic</option><option value="premium">Premium</option><option value="vip">VIP</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Status<select value={form.status} disabled={creating} onChange={e => field('status',e.target.value)}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
           <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Dashboard Link<input type="url" value={form.dashboardLink} disabled={creating} onChange={e => field('dashboardLink',e.target.value)} placeholder="https://..." /></label>
+          <label style={{display:'grid',gap:7,fontSize:12,fontWeight:750}}>Adsterra Placement ID<input inputMode="numeric" pattern="[0-9]+" value={form.adsterraPlacementId} disabled={creating} onChange={e => field('adsterraPlacementId',e.target.value.replace(/[^0-9]/g,''))} placeholder="Contoh: 30659021" /></label>
         </div>
         <div style={{display:'flex',justifyContent:'flex-end',gap:9,marginTop:20}}><button type="button" className="ghost" disabled={creating} onClick={() => setShowCreate(false)}>Batal</button><button type="submit" disabled={creating} style={{background:'linear-gradient(135deg,#35d399,#20b981)',color:'#04130d',minWidth:140}}>{creating ? 'Membuat...' : '✓ Buat User'}</button></div>
       </form>
