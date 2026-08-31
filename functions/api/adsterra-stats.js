@@ -47,7 +47,26 @@ export async function onRequestGet(context) {
   if (profileError) return json({ error: `Gagal memeriksa role admin: ${profileError.message}` }, 500)
   if (String(profile?.role || '').trim().toLowerCase() !== 'admin') return json({ error: 'Akses admin diperlukan.' }, 403)
 
+  // Safe diagnostic: never returns the secret itself.
   const url = new URL(request.url)
+  if (url.searchParams.get('diagnostic') === '1') {
+    return json({
+      ok: true,
+      adsterra_api_key: {
+        configured: true,
+        length: apiKey.length,
+        has_whitespace_edges: apiKey !== String(env.ADSTERRA_API_KEY || '').trim()
+      },
+      supabase: {
+        configured: true
+      },
+      admin: {
+        authenticated: true,
+        role: 'admin'
+      }
+    })
+  }
+
   const placement = url.searchParams.get('placement')?.trim() || ''
   const domain = url.searchParams.get('domain')?.trim() || ''
   const startDate = url.searchParams.get('start_date')?.trim() || '2020-01-01'
