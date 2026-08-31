@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { signIn } from '../lib/auth'
+import './landing-premium.css'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -32,19 +33,12 @@ export default function Login() {
         <p className="landing-kicker">SMART • SIMPLE • REWARDING</p>
         <h1>Turn your time into <span>opportunity.</span></h1>
         <p className="landing-description">Platform reward modern untuk mengakses exclusive offers, memantau performa, dan mengelola penghasilan Anda dalam satu dashboard.</p>
-        <div className="landing-points">
-          <div><strong>01</strong><span>Exclusive offers</span></div>
-          <div><strong>02</strong><span>Real-time performance</span></div>
-          <div><strong>03</strong><span>Simple reward system</span></div>
-        </div>
+        <div className="landing-points"><div><strong>01</strong><span>Exclusive offers</span></div><div><strong>02</strong><span>Real-time performance</span></div><div><strong>03</strong><span>Simple reward system</span></div></div>
       </div>
-
       <section className="card auth-card auth-premium landing-login">
         <div className="auth-glow" aria-hidden="true" />
         <div className="login-status"><span /> SYSTEM ONLINE</div>
-        <p className="eyebrow">WELCOME BACK</p>
-        <h2>Sign in</h2>
-        <p className="muted login-subtitle">Masuk untuk melanjutkan ke dashboard DollarRise.</p>
+        <p className="eyebrow">WELCOME BACK</p><h2>Sign in</h2><p className="muted login-subtitle">Masuk untuk melanjutkan ke dashboard DollarRise.</p>
         <form onSubmit={submit}>
           <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="nama@email.com" /></label>
           <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" placeholder="Masukkan password" /></label>
