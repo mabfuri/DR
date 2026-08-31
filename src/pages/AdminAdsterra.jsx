@@ -42,7 +42,17 @@ export default function AdminAdsterra() {
     setLoading(false)
   }
 
-  useEffect(() => { loadUsers() }, [])
+  async function loadCachedStats() {
+    const { data, error: statsError } = await supabase
+      .from('adsterra_stats_cache')
+      .select('user_id,impressions,clicks,ctr,cpm,revenue,updated_at')
+    if (statsError) return
+    const mapped = {}
+    ;(data || []).forEach(row => { mapped[row.user_id] = { ...row, impressions: Number(row.impressions) || 0, clicks: Number(row.clicks) || 0, ctr: Number(row.ctr) || 0, cpm: Number(row.cpm) || 0, revenue: Number(row.revenue) || 0 } })
+    setStats(mapped)
+  }
+
+  useEffect(() => { loadUsers(); loadCachedStats() }, [])
 
   async function loadStats(user) {
     const placement = String(user.adsterra_placement_id || '').trim()
@@ -53,21 +63,19 @@ export default function AdminAdsterra() {
       const token = sessionData?.session?.access_token
       if (!token) throw new Error('Sesi admin tidak ditemukan.')
       const params = new URLSearchParams({ placement })
-      const response = await fetch(`/api/adsterra-stats?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
-      })
+      const response = await fetch(`/api/adsterra-stats?${params.toString()}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
         const details = body?.details ? ` ${typeof body.details === 'string' ? body.details : JSON.stringify(body.details)}` : ''
         throw new Error(`${body?.error || 'Gagal mengambil statistik Adsterra.'}${details}`)
       }
-      setStats(current => ({ ...current, [user.id]: summarize(body.data) }))
+      const metric = summarize(body.data)
+      const { error: saveError } = await supabase.from('adsterra_stats_cache').upsert({ user_id: user.id, ...metric, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+      if (saveError) throw new Error(`Statistik berhasil diambil tetapi gagal disimpan: ${saveError.message}`)
+      setStats(current => ({ ...current, [user.id]: metric }))
       setNotice(`Statistik ${user.username || 'user'} berhasil diperbarui.`)
-    } catch (err) {
-      setError(err?.message || 'Gagal mengambil statistik Adsterra.')
-    } finally {
-      setLoadingStats(null)
-    }
+    } catch (err) { setError(err?.message || 'Gagal mengambil statistik Adsterra.') }
+    finally { setLoadingStats(null) }
   }
 
   const filtered = useMemo(() => {
@@ -78,14 +86,8 @@ export default function AdminAdsterra() {
   if (loading) return <section className="card"><p>Memuat konfigurasi Adsterra...</p></section>
 
   return <section className="admin-users">
-    <div className="card">
-      <h2>Adsterra Statistics</h2>
-      <p className="muted">Placement ID digunakan untuk Smartlink. API Key Adsterra dipanggil hanya dari Cloudflare Function dan tidak dikirim ke browser.</p>
-    </div>
-    <div className="card" style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}>
-      <span aria-hidden="true">⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username atau Placement ID..." style={{flex:1,minWidth:0}} />
-      <span className="muted small">{filtered.length}/{users.length}</span>
-    </div>
+    <div className="card"><h2>Adsterra Statistics</h2><p className="muted">Placement ID digunakan untuk Smartlink. API Key Adsterra dipanggil hanya dari Cloudflare Function dan tidak dikirim ke browser.</p></div>
+    <div className="card" style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}><span aria-hidden="true">⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username atau Placement ID..." style={{flex:1,minWidth:0}} /><span className="muted small">{filtered.length}/{users.length}</span></div>
     {error && <div className="error card" style={{padding:14,marginTop:12}}>{error}</div>}
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
     <div style={{display:'grid',gap:10,marginTop:12}}>
