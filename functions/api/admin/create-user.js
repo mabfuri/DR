@@ -21,6 +21,7 @@ export async function onRequestPost(context) {
 
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
   const username = typeof body?.username === 'string' ? body.username.trim() : ''
+  const whatsapp = typeof body?.whatsapp === 'string' ? body.whatsapp.trim() : ''
   const password = typeof body?.password === 'string' ? body.password : ''
   const role = body?.role === 'admin' ? 'admin' : 'user'
   const level = ['free', 'basic', 'premium', 'vip'].includes(body?.level) ? body.level : 'free'
@@ -30,6 +31,7 @@ export async function onRequestPost(context) {
 
   if (!email || !email.includes('@')) return json({ error: 'Email valid wajib diisi.' }, 400)
   if (!username || username.length < 2 || username.length > 50) return json({ error: 'Username harus 2-50 karakter.' }, 400)
+  if (!whatsapp) return json({ error: 'Nomor WhatsApp wajib diisi.' }, 400)
   if (password.length < 8) return json({ error: 'Password minimal 8 karakter.' }, 400)
 
   const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -54,7 +56,7 @@ export async function onRequestPost(context) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { username }
+    user_metadata: { username, whatsapp }
   })
   if (createError || !created?.user) return json({ error: createError?.message || 'Gagal membuat akun.' }, 400)
 
@@ -75,5 +77,14 @@ export async function onRequestPost(context) {
     return json({ error: `Akun dibuat tetapi profil gagal disiapkan: ${profileError.message}` }, 500)
   }
 
-  return json({ ok: true, user: { id: newUserId, username, email, role, level, status } }, 201)
+  const { error: whatsappError } = await supabaseAdmin
+    .from('profiles')
+    .update({ whatsapp })
+    .eq('id', newUserId)
+  if (whatsappError) {
+    await supabaseAdmin.auth.admin.deleteUser(newUserId)
+    return json({ error: `Profil dibuat tetapi WA gagal disimpan: ${whatsappError.message}` }, 500)
+  }
+
+  return json({ ok: true, user: { id: newUserId, username, email, whatsapp, role, level, status } }, 201)
 }
