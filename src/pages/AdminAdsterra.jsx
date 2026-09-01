@@ -17,14 +17,34 @@ function metricValue(row, ...keys) {
   return 0
 }
 
+function isMetricRow(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const keys = Object.keys(value).map(key => key.toLowerCase())
+  return keys.some(key => ['impressions', 'impression', 'clicks', 'click', 'revenue', 'earnings', 'ctr', 'cpm'].includes(key))
+}
+
+function collectRows(payload, rows = [], depth = 0) {
+  if (depth > 6 || payload == null) return rows
+  if (Array.isArray(payload)) {
+    payload.forEach(item => collectRows(item, rows, depth + 1))
+    return rows
+  }
+  if (typeof payload !== 'object') return rows
+  if (isMetricRow(payload)) {
+    rows.push(payload)
+    return rows
+  }
+  Object.values(payload).forEach(value => collectRows(value, rows, depth + 1))
+  return rows
+}
+
 function normalizeRows(payload) {
-  const source = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.data?.items) ? payload.data.items : Array.isArray(payload?.result) ? payload.result : []
-  return source.map(row => ({
-    impressions: metricNumber(metricValue(row, 'impressions', 'Impressions', 'impression', 'Impression')),
-    clicks: metricNumber(metricValue(row, 'clicks', 'Clicks', 'click', 'Click')),
-    ctr: metricNumber(metricValue(row, 'ctr', 'CTR')),
-    cpm: metricNumber(metricValue(row, 'cpm', 'CPM')),
-    revenue: metricNumber(metricValue(row, 'revenue', 'Revenue'))
+  return collectRows(payload).map(row => ({
+    impressions: metricNumber(metricValue(row, 'impressions', 'Impressions', 'impression', 'Impression', 'impression_count', 'impressions_count')),
+    clicks: metricNumber(metricValue(row, 'clicks', 'Clicks', 'click', 'Click', 'click_count', 'clicks_count')),
+    ctr: metricNumber(metricValue(row, 'ctr', 'CTR', 'click_through_rate')),
+    cpm: metricNumber(metricValue(row, 'cpm', 'CPM', 'cost_per_mille')),
+    revenue: metricNumber(metricValue(row, 'revenue', 'Revenue', 'earnings', 'Earnings'))
   }))
 }
 
@@ -87,7 +107,7 @@ export default function AdminAdsterra() {
         const details = body?.details ? ` ${typeof body.details === 'string' ? body.details : JSON.stringify(body.details)}` : ''
         throw new Error(`${body?.error || 'Gagal mengambil statistik Adsterra.'}${details}`)
       }
-      const metric = summarize(body.data)
+      const metric = summarize(body.data ?? body)
       const { error: saveError } = await supabase.from('adsterra_stats_cache').upsert({ user_id: user.id, ...metric, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
       if (saveError) throw new Error(`Statistik berhasil diambil tetapi gagal disimpan: ${saveError.message}`)
       setStats(current => ({ ...current, [user.id]: metric }))
