@@ -1,14 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+function metricNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  const text = String(value ?? '').trim()
+  if (!text) return 0
+  const normalized = text.replace(/[$€£%]/g, '').replace(/\s/g, '').replace(/,/g, '')
+  const number = Number(normalized)
+  return Number.isFinite(number) ? number : 0
+}
+
+function metricValue(row, ...keys) {
+  for (const key of keys) {
+    if (row && row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key]
+  }
+  return 0
+}
+
 function normalizeRows(payload) {
-  const source = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.items) ? payload.items : []
+  const source = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.data?.items) ? payload.data.items : Array.isArray(payload?.result) ? payload.result : []
   return source.map(row => ({
-    impressions: Number(row.impressions ?? row.Impressions ?? 0) || 0,
-    clicks: Number(row.clicks ?? row.Clicks ?? 0) || 0,
-    ctr: Number(row.ctr ?? row.CTR ?? 0) || 0,
-    cpm: Number(row.cpm ?? row.CPM ?? 0) || 0,
-    revenue: Number(row.revenue ?? row.Revenue ?? 0) || 0
+    impressions: metricNumber(metricValue(row, 'impressions', 'Impressions', 'impression', 'Impression')),
+    clicks: metricNumber(metricValue(row, 'clicks', 'Clicks', 'click', 'Click')),
+    ctr: metricNumber(metricValue(row, 'ctr', 'CTR')),
+    cpm: metricNumber(metricValue(row, 'cpm', 'CPM')),
+    revenue: metricNumber(metricValue(row, 'revenue', 'Revenue'))
   }))
 }
 
@@ -50,7 +66,7 @@ export default function AdminAdsterra() {
       .select('user_id,impressions,clicks,ctr,cpm,revenue,updated_at')
     if (statsError) return
     const mapped = {}
-    ;(data || []).forEach(row => { mapped[row.user_id] = { ...row, impressions: Number(row.impressions) || 0, clicks: Number(row.clicks) || 0, ctr: Number(row.ctr) || 0, cpm: Number(row.cpm) || 0, revenue: Number(row.revenue) || 0 } })
+    ;(data || []).forEach(row => { mapped[row.user_id] = { ...row, impressions: metricNumber(row.impressions), clicks: metricNumber(row.clicks), ctr: metricNumber(row.ctr), cpm: metricNumber(row.cpm), revenue: metricNumber(row.revenue) } })
     setStats(mapped)
   }
 
