@@ -64,7 +64,8 @@ export default function AdminAdsterra() {
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [loadingStats, setLoadingStats] = useState(null)
+  const [refreshingAll, setRefreshingAll] = useState(false)
+  const [refreshProgress, setRefreshProgress] = useState({ done: 0, total: 0 })
   const [stats, setStats] = useState({})
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -92,28 +93,60 @@ export default function AdminAdsterra() {
 
   useEffect(() => { loadUsers(); loadCachedStats() }, [])
 
-  async function loadStats(user) {
+  async function getFreshStats(user, token) {
     const placement = String(user.adsterra_placement_id || '').trim()
-    if (!placement) { setError(`Placement ID Adsterra ${user.username || 'user'} belum diisi.`); return }
-    setLoadingStats(user.id); setError(''); setNotice('')
+    if (!placement) throw new Error(`Placement ID Adsterra ${user.username || 'user'} belum diisi.`)
+    const params = new URLSearchParams({ placement })
+    const response = await fetch(`/api/adsterra-stats?${params.toString()}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const details = body?.details ? ` ${typeof body.details === 'string' ? body.details : JSON.stringify(body.details)}` : ''
+      throw new Error(`${body?.error || 'Gagal mengambil statistik Adsterra.'}${details}`)
+    }
+    return summarize(body.data ?? body)
+  }
+
+  async function refreshAllStats() {
+    if (refreshingAll) return
+    setRefreshingAll(true)
+    setRefreshProgress({ done: 0, total: users.length })
+    setError('')
+    setNotice('')
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData?.session?.access_token
       if (!token) throw new Error('Sesi admin tidak ditemukan.')
-      const params = new URLSearchParams({ placement })
-      const response = await fetch(`/api/adsterra-stats?${params.toString()}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
-      const body = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        const details = body?.details ? ` ${typeof body.details === 'string' ? body.details : JSON.stringify(body.details)}` : ''
-        throw new Error(`${body?.error || 'Gagal mengambil statistik Adsterra.'}${details}`)
+      const usersWithPlacement = users.filter(user => String(user.adsterra_placement_id || '').trim())
+      const skipped = users.length - usersWithPlacement.length
+      setRefreshProgress({ done: 0, total: usersWithPlacement.length })
+      const freshStats = {}
+      let successCount = 0
+      const failedUsers = []
+      for (const user of usersWithPlacement) {
+        try {
+          const metric = await getFreshStats(user, token)
+          const updatedAt = new Date().toISOString()
+          const { error: saveError } = await supabase.from('adsterra_stats_cache').upsert({ user_id: user.id, ...metric, updated_at: updatedAt }, { onConflict: 'user_id' })
+          if (saveError) throw new Error(saveError.message)
+          freshStats[user.id] = { ...metric, updated_at: updatedAt }
+          successCount += 1
+        } catch (err) {
+          failedUsers.push(`${user.username || 'user'}: ${err?.message || 'gagal'}`)
+        } finally {
+          setRefreshProgress(current => ({ ...current, done: current.done + 1 }))
+        }
       }
-      const metric = summarize(body.data ?? body)
-      const { error: saveError } = await supabase.from('adsterra_stats_cache').upsert({ user_id: user.id, ...metric, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-      if (saveError) throw new Error(`Statistik berhasil diambil tetapi gagal disimpan: ${saveError.message}`)
-      setStats(current => ({ ...current, [user.id]: metric }))
-      setNotice(`Statistik ${user.username || 'user'} berhasil diperbarui.`)
-    } catch (err) { setError(err?.message || 'Gagal mengambil statistik Adsterra.') }
-    finally { setLoadingStats(null) }
+      setStats(current => ({ ...current, ...freshStats }))
+      const parts = [`${successCount} member berhasil diperbarui`]
+      if (skipped > 0) parts.push(`${skipped} member dilewati karena Placement ID belum diisi`)
+      if (failedUsers.length > 0) parts.push(`${failedUsers.length} member gagal diperbarui`)
+      setNotice(`Statistik Adsterra fresh selesai. ${parts.join(' • ')}.`)
+      if (failedUsers.length > 0) setError(`Gagal: ${failedUsers.join(' | ')}`)
+    } catch (err) {
+      setError(err?.message || 'Gagal memperbarui statistik Adsterra.')
+    } finally {
+      setRefreshingAll(false)
+    }
   }
 
   const filtered = useMemo(() => {
@@ -124,7 +157,17 @@ export default function AdminAdsterra() {
   if (loading) return <section className="card"><p>Memuat konfigurasi Adsterra...</p></section>
 
   return <section className="admin-users">
-    <div className="card"><h2>Adsterra Statistics</h2><p className="muted">Placement ID digunakan untuk Smartlink. API Key Adsterra dipanggil hanya dari Cloudflare Function dan tidak dikirim ke browser.</p></div>
+    <div className="card">
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+        <div>
+          <h2 style={{marginBottom:4}}>Adsterra Statistics</h2>
+          <p className="muted" style={{margin:0}}>Placement ID digunakan untuk Smartlink. API Key Adsterra dipanggil hanya dari Cloudflare Function dan tidak dikirim ke browser.</p>
+        </div>
+        <button type="button" className="ghost" onClick={refreshAllStats} disabled={refreshingAll || users.length === 0}>
+          {refreshingAll ? `MEMUAT ${refreshProgress.done}/${refreshProgress.total}...` : '↻ Fresh Statistik Semua Member'}
+        </button>
+      </div>
+    </div>
     <div className="card" style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}><span aria-hidden="true">⌕</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari username atau Placement ID..." style={{flex:1,minWidth:0}} /><span className="muted small">{filtered.length}/{users.length}</span></div>
     {error && <div className="error card" style={{padding:14,marginTop:12}}>{error}</div>}
     {notice && <div className="success card" style={{padding:14,marginTop:12}}>{notice}</div>}
@@ -132,9 +175,9 @@ export default function AdminAdsterra() {
       {filtered.map(user => {
         const metric = stats[user.id] || emptyMetric
         return <article className="card" key={user.id} style={{display:'grid',gap:12}}>
-          <div style={{display:'grid',gridTemplateColumns:'minmax(180px,1fr) auto',gap:12,alignItems:'center'}}>
-            <div><strong>{user.username || 'Tanpa username'}</strong><p className="muted small" style={{margin:'4px 0 0'}}>{user.status || 'active'} • {(user.level || 'free').toUpperCase()} • Placement ID: {user.adsterra_placement_id || 'Belum diatur'}</p></div>
-            <button type="button" className="ghost" disabled={loadingStats === user.id || !user.adsterra_placement_id} onClick={() => loadStats(user)}>{loadingStats === user.id ? 'MEMUAT...' : 'Statistik'}</button>
+          <div>
+            <strong>{user.username || 'Tanpa username'}</strong>
+            <p className="muted small" style={{margin:'4px 0 0'}}>{user.status || 'active'} • {(user.level || 'free').toUpperCase()} • Placement ID: {user.adsterra_placement_id || 'Belum diatur'}</p>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:8}}>
             <div className="card"><span className="muted small">Impressions</span><strong>{metric.impressions.toLocaleString('id-ID')}</strong></div>
