@@ -1,5 +1,33 @@
 import { supabase } from './supabase'
 
+function metricNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  const text = String(value ?? '').trim()
+  if (!text) return 0
+  const normalized = text
+    .replace(/[$€£%]/g, '')
+    .replace(/\s/g, '')
+    .replace(/,/g, '')
+  const number = Number(normalized)
+  return Number.isFinite(number) ? number : 0
+}
+
+function metricValue(row, ...keys) {
+  for (const key of keys) {
+    if (row && row[key] !== undefined && row[key] !== null && row[key] !== '') return row[key]
+  }
+  return 0
+}
+
+function extractRows(payload) {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.items)) return payload.items
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.data?.items)) return payload.data.items
+  if (Array.isArray(payload?.result)) return payload.result
+  return []
+}
+
 export async function getAdsterraStats({ offerId, placement, domain = '', startDate = '2020-01-01', finishDate } = {}) {
   const normalizedOfferId = String(offerId || '').trim()
   const normalizedPlacement = String(placement || '').trim()
@@ -14,11 +42,11 @@ export async function getAdsterraStats({ offerId, placement, domain = '', startD
 
   if (!cacheError && cached) {
     return {
-      impressions: Number(cached.impressions || 0),
-      clicks: Number(cached.clicks || 0),
-      ctr: Number(cached.ctr || 0),
-      cpm: Number(cached.cpm || 0),
-      revenue: Number(cached.revenue || 0),
+      impressions: metricNumber(cached.impressions),
+      clicks: metricNumber(cached.clicks),
+      ctr: metricNumber(cached.ctr),
+      cpm: metricNumber(cached.cpm),
+      revenue: metricNumber(cached.revenue),
       offerId: cached.offer_id,
       updatedAt: cached.updated_at,
       raw: { source: 'offer_adsterra_stats_cache' },
@@ -47,11 +75,11 @@ export async function getAdsterraStats({ offerId, placement, domain = '', startD
     throw new Error(`${data?.error || 'Gagal mengambil statistik Adsterra.'}${details}`)
   }
 
-  const rows = Array.isArray(data?.data?.items) ? data.data.items : Array.isArray(data?.data) ? data.data : []
+  const rows = extractRows(data?.data ?? data)
   const totals = rows.reduce((acc, row) => {
-    acc.impressions += Number(row.impressions || 0)
-    acc.clicks += Number(row.clicks || 0)
-    acc.revenue += Number(row.revenue || 0)
+    acc.impressions += metricNumber(metricValue(row, 'impressions', 'Impressions', 'impression', 'Impression'))
+    acc.clicks += metricNumber(metricValue(row, 'clicks', 'Clicks', 'click', 'Click'))
+    acc.revenue += metricNumber(metricValue(row, 'revenue', 'Revenue'))
     return acc
   }, { impressions: 0, clicks: 0, revenue: 0 })
 
