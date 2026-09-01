@@ -6,6 +6,7 @@ export default function Register() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -14,7 +15,7 @@ export default function Register() {
   async function submit(e) {
     e.preventDefault(); setError(''); setMessage(''); setLoading(true)
     try {
-      const data = await signUp(email, password, username)
+      const data = await signUp(email, password, username, whatsapp)
       if (data.session) navigate('/', { replace: true })
       else setMessage('Registrasi berhasil. Silakan cek email untuk konfirmasi akun.')
     } catch (err) { setError(err.message || 'Registrasi gagal.') }
@@ -28,6 +29,7 @@ export default function Register() {
     <form onSubmit={submit}>
       <label>Username<input value={username} onChange={e => setUsername(e.target.value)} minLength={3} required autoComplete="username" placeholder="Username Anda" /></label>
       <label>Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="nama@email.com" /></label>
+      <label>Nomor WhatsApp<input type="tel" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} required autoComplete="tel" inputMode="tel" placeholder="08xxxxxxxxxx" /></label>
       <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={6} required autoComplete="new-password" placeholder="Minimal 6 karakter" /></label>
       {error && <p className="error">{error}</p>}{message && <p className="success">{message}</p>}
       <button disabled={loading}>{loading ? 'MEMPROSES...' : 'BUAT AKUN →'}</button>
