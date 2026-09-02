@@ -69,21 +69,13 @@ export async function onRequestPost(context) {
     p_level: level,
     p_status: status,
     p_exclusive_link: exclusiveLink || null,
-    p_dashboard_link: dashboardLink || null
+    p_dashboard_link: dashboardLink || null,
+    p_whatsapp: whatsapp
   })
 
   if (profileError) {
     await supabaseAdmin.auth.admin.deleteUser(newUserId)
     return json({ error: `Akun dibuat tetapi profil gagal disiapkan: ${profileError.message}` }, 500)
-  }
-
-  const { error: whatsappError } = await supabaseAdmin
-    .from('profiles')
-    .update({ whatsapp })
-    .eq('id', newUserId)
-  if (whatsappError) {
-    await supabaseAdmin.auth.admin.deleteUser(newUserId)
-    return json({ error: `Profil dibuat tetapi WA gagal disimpan: ${whatsappError.message}` }, 500)
   }
 
   return json({ ok: true, user: { id: newUserId, username, email, whatsapp, role, level, status } }, 201)
