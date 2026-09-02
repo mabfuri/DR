@@ -11,10 +11,13 @@ export async function signIn(email, password) {
 
 export async function signUp(email, password, username, whatsapp, profileData = {}) {
   if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
-  const normalizedWhatsapp = String(whatsapp || '').trim()
+
+  // Semua data pendaftaran dikirim ke Auth metadata.
+  // Trigger public.handle_new_user() akan menyalinnya ke public.profiles
+  // sehingga tetap tersimpan walaupun email confirmation aktif dan session belum tersedia.
   const metadata = {
-    username,
-    whatsapp: normalizedWhatsapp,
+    username: String(username || '').trim(),
+    whatsapp: String(whatsapp || '').trim(),
     nik: String(profileData.nik || '').trim(),
     full_name: String(profileData.full_name || '').trim(),
     bank: String(profileData.bank || '').trim(),
