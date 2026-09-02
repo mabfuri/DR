@@ -14,7 +14,16 @@ create table public.profiles (
   status public.user_status not null default 'active',
   exclusive_link text,
   personal_dashboard_link text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  nik text,
+  full_name text,
+  bank text,
+  account_number text,
+  address text,
+  sponsor text,
+  paket_join text,
+  ahli_waris text,
+  whatsapp text
 );
 
 create table public.balances (
@@ -95,12 +104,25 @@ create policy "admin manage withdrawals" on public.withdrawals for update using 
 
 create policy "admin manage adsterra settings" on public.adsterra_settings for all using (public.is_admin()) with check (public.is_admin());
 
--- New users get a profile and zero balance. Set admin manually after creation.
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, username) values (new.id, coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)));
+  insert into public.profiles (
+    id, username, whatsapp, nik, full_name, bank, account_number, address, sponsor, paket_join, ahli_waris
+  ) values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    nullif(trim(new.raw_user_meta_data->>'whatsapp'), ''),
+    nullif(trim(new.raw_user_meta_data->>'nik'), ''),
+    nullif(trim(new.raw_user_meta_data->>'full_name'), ''),
+    nullif(trim(new.raw_user_meta_data->>'bank'), ''),
+    nullif(trim(new.raw_user_meta_data->>'account_number'), ''),
+    nullif(trim(new.raw_user_meta_data->>'address'), ''),
+    nullif(trim(new.raw_user_meta_data->>'sponsor'), ''),
+    nullif(trim(new.raw_user_meta_data->>'paket_join'), ''),
+    nullif(trim(new.raw_user_meta_data->>'ahli_waris'), '')
+  );
   insert into public.balances (user_id) values (new.id);
   return new;
 end;
