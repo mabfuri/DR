@@ -5,7 +5,7 @@ function json(body, status = 200) { return new Response(JSON.stringify(body), { 
 function normalizeSlug(value) { return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toLowerCase() }
 function getSlug(context) { return context.params?.slug || new URL(context.request.url).pathname.split('/').filter(Boolean).pop() || '' }
 function getClientIp(request) { return request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown' }
-async function sha256(value) { const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('') }
+async function sha256(value) { const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); return [...new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('') }
 
 async function getContextData(env, slug) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase server configuration belum lengkap.')
@@ -50,18 +50,35 @@ export async function onRequestPost(context) {
     const { db, profile, offer } = await getContextData(env, getSlug(context))
     if (!profile) return json({ error: 'User tidak ditemukan.' }, 404)
     if (!offer) return json({ error: 'Belum ada offer aktif untuk user ini.' }, 404)
+
     const secret = String(env.LP_IP_HASH_SECRET || env.SUPABASE_SERVICE_ROLE_KEY || '')
     const ipHash = await sha256(`${secret}:${getClientIp(request)}`)
-    const now = Date.now(); const hourAgo = new Date(now - 60 * 60 * 1000).toISOString(); const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString()
-    const [{ count: hourlyCount, error: hourError }, { count: dailyIpCount, error: dayError }] = await Promise.all([
-      db.from('lp_clicks').select('id', { count: 'exact', head: true }).eq('offer_id', offer.id).gte('clicked_at', hourAgo),
-      db.from('lp_clicks').select('id', { count: 'exact', head: true }).eq('ip_hash', ipHash).gte('clicked_at', dayAgo)
-    ])
-    if (hourError || dayError) throw new Error(hourError?.message || dayError?.message)
-    if (Number(hourlyCount || 0) >= 10) return json({ allowed: false, reason: '10 klik dalam 1 jam untuk offer ini sudah tercapai.' }, 429)
-    if (Number(dailyIpCount || 0) >= 10) return json({ allowed: false, reason: 'IP ini sudah mencapai 10 klik dalam 24 jam.' }, 429)
-    const { error: insertError } = await db.from('lp_clicks').insert({ offer_id: offer.id, ip_hash: ipHash })
-    if (insertError) throw new Error(insertError.message)
-    return json({ allowed: true, link: offer.link, remainingHourly: Math.max(0, 9 - Number(hourlyCount || 0)), remainingIpDaily: Math.max(0, 9 - Number(dailyIpCount || 0)) })
+
+    // Check + insert is performed atomically inside Postgres. This prevents
+    // concurrent requests/tabs from bypassing the 10-click hourly limit.
+    const { data, error } = await db.rpc('record_lp_click', {
+      p_offer_id: offer.id,
+      p_ip_hash: ipHash,
+      p_hour_limit: 10,
+      p_ip_daily_limit: 10
+    })
+    if (error) throw new Error(error.message)
+
+    const result = Array.isArray(data) ? data[0] : data
+    if (!result?.allowed) {
+      return json({
+        allowed: false,
+        reason: result?.reason || 'Batas klik telah tercapai.',
+        remainingHourly: Number(result?.remaining_hourly ?? 0),
+        remainingIpDaily: Number(result?.remaining_ip_daily ?? 0)
+      }, 429)
+    }
+
+    return json({
+      allowed: true,
+      link: offer.link,
+      remainingHourly: Number(result.remaining_hourly ?? 0),
+      remainingIpDaily: Number(result.remaining_ip_daily ?? 0)
+    })
   } catch (error) { return json({ error: error?.message || 'Gagal memproses klik.' }, 500) }
 }
