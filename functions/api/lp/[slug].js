@@ -5,7 +5,7 @@ function json(body, status = 200) { return new Response(JSON.stringify(body), { 
 function normalizeSlug(value) { return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toLowerCase() }
 function getSlug(context) { return context.params?.slug || new URL(context.request.url).pathname.split('/').filter(Boolean).pop() || '' }
 function getClientIp(request) { return request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown' }
-async function sha256(value) { const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); return [...new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('') }
+async function sha256(value) { const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('') }
 
 async function getContextData(env, slug) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase server configuration belum lengkap.')
