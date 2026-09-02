@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const emptyForm = { username:'', email:'', whatsapp:'', password:'', nik:'', fullName:'', bank:'', accountNumber:'', address:'', sponsor:'', paketJoin:'', ahliWaris:'', role:'user', level:'free', status:'active', dashboardLink:'', adsterraPlacementId:'' }
@@ -9,13 +9,25 @@ export default function AdminUsers(){
   const [saving,setSaving]=useState(null),[editingUser,setEditingUser]=useState(null),[editForm,setEditForm]=useState(null),[savingEdit,setSavingEdit]=useState(false)
   const [passwords,setPasswords]=useState({}),[showCreate,setShowCreate]=useState(false),[creating,setCreating]=useState(false),[form,setForm]=useState(emptyForm)
   const [search,setSearch]=useState(''),[statusFilter,setStatusFilter]=useState('all'),[levelFilter,setLevelFilter]=useState('all')
+  const loadedOnce=useRef(false)
 
   async function loadUsers(){
-    setLoading(true);setError('')
+    if(!loadedOnce.current)setLoading(true)
+    setError('')
     const {data:sessionData}=await supabase.auth.getSession();const adminId=sessionData.session?.user?.id
-    if(!adminId){setError('Sesi admin tidak ditemukan.');setUsers([]);setLoading(false);return}
+    if(!adminId){
+      setError('Sesi admin belum siap. Data yang sudah tampil dipertahankan.')
+      if(!loadedOnce.current)setLoading(false)
+      return
+    }
     const {data,error:loadError}=await supabase.rpc('admin_list_profiles',{p_admin_id:adminId})
-    if(loadError){setError(`Gagal memuat data member: ${loadError.message}`);setUsers([])}else setUsers(data||[])
+    if(loadError){
+      setError(`Gagal memuat ulang data member: ${loadError.message}`)
+      if(!loadedOnce.current)setLoading(false)
+      return
+    }
+    setUsers(data||[])
+    loadedOnce.current=true
     setLoading(false)
   }
   useEffect(()=>{loadUsers()},[])
