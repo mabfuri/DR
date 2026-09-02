@@ -55,7 +55,12 @@ export default function Register() {
       <label>No Rek<input value={form.accountNumber} onChange={e => update('accountNumber', e.target.value)} required inputMode="numeric" placeholder="Nomor rekening" /></label>
       <label>Alamat<textarea value={form.address} onChange={e => update('address', e.target.value)} required rows="3" placeholder="Alamat lengkap" /></label>
       <label>Sponsor<input value={form.sponsor} onChange={e => update('sponsor', e.target.value)} required placeholder="Username sponsor" /></label>
-      <label>Paket Join<input value={form.paketJoin} onChange={e => update('paketJoin', e.target.value)} required placeholder="Paket yang dipilih" /></label>
+      <label>Paket Join<select value={form.paketJoin} onChange={e => update('paketJoin', e.target.value)} required>
+        <option value="">Pilih Paket Join</option>
+        <option value="Basic">Basic</option>
+        <option value="Premium">Premium</option>
+        <option value="VIP">VIP</option>
+      </select></label>
       <label>Ahli Waris<input value={form.ahliWaris} onChange={e => update('ahliWaris', e.target.value)} required placeholder="Nama ahli waris" /></label>
       <label>Password<input type="password" value={form.password} onChange={e => update('password', e.target.value)} minLength={6} required autoComplete="new-password" placeholder="Minimal 6 karakter" /></label>
       {error && <p className="error">{error}</p>}{message && <p className="success">{message}</p>}
