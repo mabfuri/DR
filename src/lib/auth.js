@@ -9,27 +9,40 @@ export async function signIn(email, password) {
   return data
 }
 
-export async function signUp(email, password, username, whatsapp) {
+export async function signUp(email, password, username, whatsapp, profileData = {}) {
   if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
   const normalizedWhatsapp = String(whatsapp || '').trim()
+  const metadata = {
+    username,
+    whatsapp: normalizedWhatsapp,
+    nik: String(profileData.nik || '').trim(),
+    full_name: String(profileData.full_name || '').trim(),
+    bank: String(profileData.bank || '').trim(),
+    account_number: String(profileData.account_number || '').trim(),
+    address: String(profileData.address || '').trim(),
+    sponsor: String(profileData.sponsor || '').trim(),
+    paket_join: String(profileData.paket_join || '').trim(),
+    ahli_waris: String(profileData.ahli_waris || '').trim(),
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { username, whatsapp: normalizedWhatsapp },
+      data: metadata,
       emailRedirectTo: SITE_URL,
     },
   })
   if (error) throw error
 
-  // Simpan juga langsung ke profiles saat session tersedia.
-  // Trigger database tetap dapat mengisi profil dasar; update ini hanya menambahkan WhatsApp.
-  if (data?.user?.id && normalizedWhatsapp) {
+  // Jika email confirmation dimatikan dan session langsung tersedia,
+  // pastikan data profil tersimpan juga.
+  if (data?.user?.id && data.session) {
     const { error: profileError } = await supabase
       .from('profiles')
-      .update({ whatsapp: normalizedWhatsapp })
+      .update(metadata)
       .eq('id', data.user.id)
-    if (profileError && data.session) throw profileError
+    if (profileError) throw profileError
   }
   return data
 }
