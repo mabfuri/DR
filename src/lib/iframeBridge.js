@@ -1,65 +1,41 @@
-const DASHBOARD_ORIGIN = 'https://iframe-c8r.pages.dev'
-let pendingRunUnlock = false
-let observerStarted = false
+const RELEVANT_MESSAGE_TYPES = new Set([
+  'RUN_UNLOCK',
+  'NEXT_OFFER',
+  'STOP_AUTORUN'
+])
 
-function isDashboardMessage(event) {
-  if (event.origin !== DASHBOARD_ORIGIN) {
-    console.log('[DR] message rejected: origin', event.origin)
-    return false
-  }
+if (!Array.isArray(window.__DR_PENDING_PARENT_MESSAGES)) {
+  window.__DR_PENDING_PARENT_MESSAGES = []
+}
+
+if (typeof window.__DR_DASHBOARD_MESSAGE_HANDLER_READY !== 'boolean') {
+  window.__DR_DASHBOARD_MESSAGE_HANDLER_READY = false
+}
+
+function isParentMessage(event) {
   if (event.source !== window.parent) {
-    console.log('[DR] message rejected: source is not window.parent')
+    if (RELEVANT_MESSAGE_TYPES.has(event.data?.type)) {
+      console.warn('[DR] parent message rejected: source is not window.parent', event.data?.type)
+    }
     return false
   }
   return true
-}
-
-function findUnlockButton() {
-  return document.querySelector('button.unlock:not([disabled])')
-}
-
-function replayRunUnlock() {
-  if (!pendingRunUnlock) return false
-  const button = findUnlockButton()
-  if (!button) return false
-
-  pendingRunUnlock = false
-  console.log('[DR] unlock handler started')
-  console.log('[DR] replaying RUN_UNLOCK through the existing Unlock button')
-  button.click()
-  return true
-}
-
-function startObserver() {
-  if (observerStarted) return
-  observerStarted = true
-  const observer = new MutationObserver(() => {
-    if (replayRunUnlock()) observer.disconnect()
-  })
-  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true })
-  setTimeout(() => {
-    if (replayRunUnlock()) observer.disconnect()
-  }, 0)
 }
 
 window.addEventListener('message', (event) => {
-  if (event.data?.type !== 'RUN_UNLOCK') return
-  if (!isDashboardMessage(event)) return
+  const type = event.data?.type
+  if (!RELEVANT_MESSAGE_TYPES.has(type)) return
+  if (!isParentMessage(event)) return
 
-  console.log('[DR] RUN_UNLOCK received')
-
-  // If the Dashboard React component is already mounted, its own message
-  // handler is authoritative. Only queue/replay when the app has not mounted
-  // yet, which closes the iframe-load/auth/profile timing gap.
-  const dashboardMounted = Boolean(document.querySelector('.dashboard'))
-  if (dashboardMounted) {
-    console.log('[DR] RUN_UNLOCK delegated to Dashboard handler')
+  if (window.__DR_DASHBOARD_MESSAGE_HANDLER_READY) {
     return
   }
 
-  pendingRunUnlock = true
-  startObserver()
-  replayRunUnlock()
+  window.__DR_PENDING_PARENT_MESSAGES.push({
+    data: event.data,
+    origin: event.origin || '*'
+  })
+  console.log('[DR] parent message queued before Dashboard handler:', type)
 })
 
 console.log('[DR] iframe bridge installed')
