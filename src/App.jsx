@@ -12,6 +12,8 @@ import './hero-tweaks.css'
 import './withdrawal.css'
 import './pages/user-dashboard-premium.css'
 
+const DASHBOARD_ORIGIN = 'https://iframe-c8r.pages.dev'
+
 function ConfigNotice() { return <main className="auth-page"><section className="card auth-card"><div className="brand">DollarRise</div><h1>Konfigurasi belum lengkap</h1><p className="muted">Aplikasi berhasil dimuat, tetapi Supabase belum terhubung.</p><div className="notice"><strong>Yang diperlukan:</strong><br />VITE_SUPABASE_URL<br />VITE_SUPABASE_ANON_KEY</div><p className="muted small">Tambahkan kedua Environment Variable tersebut di Cloudflare Pages, lalu lakukan redeploy.</p></section></main> }
 
 function Dashboard({ profile }) {
@@ -23,22 +25,163 @@ function Dashboard({ profile }) {
   const offerRef=useRef(null);
   const indexRef=useRef(index);
   const offersRef=useRef(offers);
+  const offersLoadedRef=useRef(false);
+  const pendingRunUnlockRef=useRef(false);
+  const dashboardOriginRef=useRef(DASHBOARD_ORIGIN);
 
   useEffect(()=>{limitedOffersRef.current=limitedOffers},[limitedOffers]);
   useEffect(()=>{offerRef.current=offers[index]||null},[offers,index]);
   useEffect(()=>{indexRef.current=index},[index]);
   useEffect(()=>{offersRef.current=offers},[offers]);
 
-  useEffect(()=>{let mounted=true;async function load(){const [{data:offersData,error:offersErr},{data:balanceData,error:balanceErr},{data:txData,error:txErr}]=await Promise.all([supabase.from('offer_owner_names').select('offer_id,owner_username').order('offer_id'),supabase.from('balances').select('balance').eq('user_id',profile.id).maybeSingle(),supabase.from('balance_transactions').select('amount,type,description').eq('user_id',profile.id).eq('type','credit')]);if(!mounted)return;if(offersErr)setOfferError(offersErr.message);else{const ownerRows=offersData||[];const ids=ownerRows.map(row=>row.offer_id).filter(Boolean);let offerRows=[];if(ids.length){const {data,error}=await supabase.from('offers').select('id,title,link,user_id,sort_order,adsterra_placement_id').in('id',ids).eq('status','active').order('sort_order',{ascending:true}).order('created_at',{ascending:false});if(error)setOfferError(error.message);else offerRows=(data||[]).map(item=>({...item,owner_username:ownerRows.find(row=>row.offer_id===item.id)?.owner_username||'',adsterra_placement_id:item.adsterra_placement_id||''}))}setOffers(offerRows);setIndex(0)}if(!balanceErr)setBalance(Number(balanceData?.balance||0));if(!txErr)setAccumulated((txData||[]).reduce((sum,r)=>sum+Number(r.amount||0),0))}load();return()=>{mounted=false}},[profile.id]);
+  const postToDashboard=(message)=>{window.parent.postMessage(message,dashboardOriginRef.current)};
+
+  async function unlockOffer(){
+    const currentOffer=offerRef.current;
+    const currentLimited=Boolean(currentOffer&&limitedOffersRef.current[currentOffer.id]);
+    if(!currentOffer){
+      console.log('[DR] unlock deferred: offers are not ready');
+      pendingRunUnlockRef.current=true;
+      return;
+    }
+    if(unlockInProgressRef.current)return;
+    if(currentLimited){
+      console.log('[DR] RUN_UNLOCK rejected by existing offer limit',currentOffer.id);
+      postToDashboard({type:'OFFER_LIMIT_REACHED',offerId:currentOffer.id});
+      return;
+    }
+    unlockInProgressRef.current=true;
+    setRewarding(true);
+    setRewardNotice('');
+    console.log('[DR] unlock started',currentOffer.id);
+    try{
+      const {data,error}=await supabase.rpc('claim_offer_reward',{p_offer_id:currentOffer.id});
+      if(error){
+        console.error('[DR] unlock RPC failed',error.message);
+        setRewardNotice(error.message);
+        return;
+      }
+      const result=Array.isArray(data)?data[0]:data;
+      console.log('[DR] unlock result',result?.click_allowed,result?.rewarded);
+      if(result?.click_allowed===false){
+        setLimitedOffers(prev=>({...prev,[currentOffer.id]:true}));
+        setRewardNotice('Batas 10 klik per jam untuk offer ini telah tercapai. Coba lagi setelah batas waktunya bergeser.');
+        postToDashboard({type:'OFFER_LIMIT_REACHED',offerId:currentOffer.id});
+        setTimeout(()=>setLimitedOffers(prev=>{const next={...prev};delete next[currentOffer.id];return next}),3600000);
+      }else if(result?.rewarded){
+        setBalance(Number(result.new_balance||0));
+        setAccumulated(v=>v+Number(result.reward_amount||0));
+        setRewardNotice(`Reward ${Number(result.reward_amount||0).toLocaleString('id-ID')} berhasil ditambahkan ke saldo.`);
+      }else if(Number(result?.daily_limit||0)===0)setRewardNotice('Level Anda tidak mendapatkan reward klik.');
+      else setRewardNotice(`Batas reward hari ini telah tercapai: Rp${Number(result?.daily_limit||0).toLocaleString('id-ID')}.`);
+      if(result?.click_allowed===true&&currentOffer.link){
+        console.log('[DR] offer selected',currentOffer.link);
+        console.log('[DR] sending OPEN_OFFER');
+        postToDashboard({type:'OPEN_OFFER',url:currentOffer.link});
+      }
+    }catch(error){
+      console.error('[DR] unlock exception',error?.message||error);
+      setRewardNotice(error?.message||'Gagal memproses unlock.');
+    }finally{
+      setRewarding(false);
+      unlockInProgressRef.current=false;
+      if(pendingRunUnlockRef.current&&offersLoadedRef.current){
+        pendingRunUnlockRef.current=false;
+        console.log('[DR] processing deferred RUN_UNLOCK');
+        queueMicrotask(()=>unlockOffer());
+      }
+    }
+  }
+
+  useEffect(()=>{
+    let mounted=true;
+    async function load(){
+      const [{data:offersData,error:offersErr},{data:balanceData,error:balanceErr},{data:txData,error:txErr}]=await Promise.all([
+        supabase.from('offer_owner_names').select('offer_id,owner_username').order('offer_id'),
+        supabase.from('balances').select('balance').eq('user_id',profile.id).maybeSingle(),
+        supabase.from('balance_transactions').select('amount,type,description').eq('user_id',profile.id).eq('type','credit')
+      ]);
+      if(!mounted)return;
+      if(offersErr)setOfferError(offersErr.message);
+      else{
+        const ownerRows=offersData||[];
+        const ids=ownerRows.map(row=>row.offer_id).filter(Boolean);
+        let offerRows=[];
+        if(ids.length){
+          const {data,error}=await supabase.from('offers').select('id,title,link,user_id,sort_order,adsterra_placement_id').in('id',ids).eq('status','active').order('sort_order',{ascending:true}).order('created_at',{ascending:false});
+          if(error)setOfferError(error.message);else offerRows=(data||[]).map(item=>({...item,owner_username:ownerRows.find(row=>row.offer_id===item.id)?.owner_username||'',adsterra_placement_id:item.adsterra_placement_id||''}));
+        }
+        offersRef.current=offerRows;
+        offerRef.current=offerRows[0]||null;
+        indexRef.current=0;
+        setOffers(offerRows);
+        setIndex(0);
+        offersLoadedRef.current=true;
+        console.log('[DR] offers ready',offerRows.length);
+        if(pendingRunUnlockRef.current&&offerRows.length&&!unlockInProgressRef.current){
+          pendingRunUnlockRef.current=false;
+          console.log('[DR] processing queued RUN_UNLOCK after offers loaded');
+          queueMicrotask(()=>unlockOffer());
+        }
+      }
+      if(!balanceErr)setBalance(Number(balanceData?.balance||0));
+      if(!txErr)setAccumulated((txData||[]).reduce((sum,r)=>sum+Number(r.amount||0),0));
+    }
+    load();
+    return()=>{mounted=false};
+  },[profile.id]);
 
   const offer=offers[index];
 
   useEffect(()=>{let mounted=true;async function loadStats(){if(!offer?.id){setStats([['Impressions','0'],['Clicks','0'],['CTR','0'],['CPM','0'],['Revenue','Rp0']]);return}setStatsError('');try{const placement=String(offer.adsterra_placement_id||'').trim();if(!placement)throw new Error('Placement ID offer aktif belum diatur.');const finishDate=new Date();const startDate=new Date(finishDate);startDate.setDate(startDate.getDate()-365);const ad=await getAdsterraStats({offerId:offer.id,placement,startDate:startDate.toISOString().slice(0,10),finishDate:finishDate.toISOString().slice(0,10)});if(mounted)setStats([['Impressions',ad.impressions.toLocaleString('id-ID')],['Clicks',ad.clicks.toLocaleString('id-ID')],['CTR',`${ad.ctr}%`],['CPM',`$${ad.cpm.toFixed(3)}`],['Revenue',`$${ad.revenue.toFixed(2)}`]])}catch(error){if(mounted)setStatsError(error.message||'Gagal memuat statistik Adsterra.')}}loadStats();return()=>{mounted=false}},[offer?.id,offer?.adsterra_placement_id]);
 
-  const move=step=>{setRewardNotice('');setIndex(i=>offers.length?(i+step+offers.length)%offers.length:0)}; const offerLimited=Boolean(offer&&limitedOffers[offer.id]);
-  async function unlockOffer(){const currentOffer=offerRef.current;const currentLimited=Boolean(currentOffer&&limitedOffersRef.current[currentOffer.id]);if(!currentOffer||unlockInProgressRef.current||currentLimited)return;unlockInProgressRef.current=true;setRewarding(true);setRewardNotice('');try{const {data,error}=await supabase.rpc('claim_offer_reward',{p_offer_id:currentOffer.id});if(error){setRewardNotice(error.message);return}const result=Array.isArray(data)?data[0]:data;if(result?.click_allowed===false){setLimitedOffers(prev=>({...prev,[currentOffer.id]:true}));setRewardNotice('Batas 10 klik per jam untuk offer ini telah tercapai. Coba lagi setelah batas waktunya bergeser.');setTimeout(()=>setLimitedOffers(prev=>{const next={...prev};delete next[currentOffer.id];return next}),3600000);window.parent.postMessage({type:'OFFER_LIMIT_REACHED',offerId:currentOffer.id},'https://iframe-c8r.pages.dev')}else if(result?.rewarded){setBalance(Number(result.new_balance||0));setAccumulated(v=>v+Number(result.reward_amount||0));setRewardNotice(`Reward ${Number(result.reward_amount||0).toLocaleString('id-ID')} berhasil ditambahkan ke saldo.`)}else if(Number(result?.daily_limit||0)===0)setRewardNotice('Level Anda tidak mendapatkan reward klik.');else setRewardNotice(`Batas reward hari ini telah tercapai: Rp${Number(result?.daily_limit||0).toLocaleString('id-ID')}.`);if(result?.click_allowed===true&&currentOffer.link){window.parent.postMessage({type:'OPEN_OFFER',url:currentOffer.link},'https://iframe-c8r.pages.dev')}}finally{setRewarding(false);unlockInProgressRef.current=false}}
+  const move=step=>{setRewardNotice('');const next=offers.length?(indexRef.current+step+offers.length)%offers.length:0;indexRef.current=next;offerRef.current=offers[next]||null;setIndex(next)};
+  const offerLimited=Boolean(offer&&limitedOffers[offer.id]);
 
-  useEffect(()=>{const handleMessage=(event)=>{if(event.origin!=='https://iframe-c8r.pages.dev')return;if(event.data?.type==='RUN_UNLOCK'){unlockOffer();return}if(event.data?.type==='NEXT_OFFER'){if(unlockInProgressRef.current)return;const currentIndex=indexRef.current;const list=offersRef.current;if(currentIndex+1<list.length){const nextIndex=currentIndex+1;indexRef.current=nextIndex;offerRef.current=list[nextIndex];setRewardNotice('');setIndex(nextIndex);window.parent.postMessage({type:'OFFER_READY'},'https://iframe-c8r.pages.dev')}else if(list.length){window.parent.postMessage({type:'ALL_OFFERS_DONE'},'https://iframe-c8r.pages.dev')}}};window.addEventListener('message',handleMessage);return()=>{window.removeEventListener('message',handleMessage)}},[]);
+  useEffect(()=>{
+    const handleMessage=(event)=>{
+      if(event.origin!==DASHBOARD_ORIGIN)return;
+      if(event.source!==window.parent)return;
+      const type=event.data?.type;
+      if(!type)return;
+      dashboardOriginRef.current=event.origin;
+      console.log('[DR] message received',type);
+      if(type==='RUN_UNLOCK'){
+        console.log('[DR] RUN_UNLOCK received');
+        if(!offersLoadedRef.current||!offerRef.current){
+          pendingRunUnlockRef.current=true;
+          console.log('[DR] RUN_UNLOCK queued until offers are ready');
+          return;
+        }
+        unlockOffer();
+        return;
+      }
+      if(type==='NEXT_OFFER'){
+        if(unlockInProgressRef.current)return;
+        const currentIndex=indexRef.current;
+        const list=offersRef.current;
+        if(currentIndex+1<list.length){
+          const nextIndex=currentIndex+1;
+          indexRef.current=nextIndex;
+          offerRef.current=list[nextIndex];
+          setRewardNotice('');
+          setIndex(nextIndex);
+          console.log('[DR] NEXT_OFFER -> OFFER_READY',list[nextIndex]?.id);
+          postToDashboard({type:'OFFER_READY'});
+        }else if(list.length){
+          console.log('[DR] NEXT_OFFER -> ALL_OFFERS_DONE');
+          postToDashboard({type:'ALL_OFFERS_DONE'});
+        }
+      }
+      if(type==='STOP_AUTORUN'){
+        pendingRunUnlockRef.current=false;
+        console.log('[DR] STOP_AUTORUN received');
+      }
+    };
+    window.addEventListener('message',handleMessage);
+    console.log('[DR] message listener installed');
+    return()=>window.removeEventListener('message',handleMessage);
+  },[]);
 
   async function submitWithdrawal(e){e.preventDefault();setWithdrawError('');setWithdrawNotice('');const amount=Number(String(withdrawAmount).replace(/[^0-9]/g,''));if(!Number.isFinite(amount)||amount<20000){setWithdrawError('Minimal penarikan adalah Rp20.000.');return}if(amount>balance){setWithdrawError('Saldo tidak mencukupi.');return}if(!bankName.trim()||!accountNumber.trim()||!accountName.trim()){setWithdrawError('Nama bank/e-wallet, nomor rekening/e-wallet, dan atas nama wajib diisi.');return}setWithdrawing(true);const {error}=await supabase.rpc('request_withdrawal',{p_amount:amount,p_payment_method:bankName.trim(),p_payment_account:accountNumber.trim(),p_beneficiary_name:accountName.trim()});if(error)setWithdrawError(error.message);else{setBalance(v=>v-amount);setWithdrawAmount('');setBankName('');setAccountNumber('');setAccountName('');setWithdrawNotice('Penarikan berhasil diajukan dan menunggu pemeriksaan Admin.')}setWithdrawing(false)}
   async function logout(){await signOut();navigate('/login',{replace:true})}
