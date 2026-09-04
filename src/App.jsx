@@ -124,6 +124,11 @@ function Dashboard({ profile }) {
         setIndex(0);
         offersLoadedRef.current=true;
         console.log('[DR] offers ready',offerRows.length);
+        if(pendingNextOfferRef.current&&!unlockInProgressRef.current){
+          pendingNextOfferRef.current=false;
+          console.log('[DR] processing queued NEXT_OFFER after offers loaded');
+          queueMicrotask(()=>handleNextOffer());
+        }
         if(pendingRunUnlockRef.current&&offerRows.length&&!unlockInProgressRef.current){
           pendingRunUnlockRef.current=false;
           console.log('[DR] processing queued RUN_UNLOCK after offers loaded');
@@ -154,8 +159,14 @@ function Dashboard({ profile }) {
     const currentIndex=indexRef.current;
     const list=offersRef.current;
     console.log('[DR] current offer index:',currentIndex);
-    if(!offersLoadedRef.current||!list.length){
-      console.warn('[DR] NEXT_OFFER rejected: offers are not ready');
+    if(!offersLoadedRef.current){
+      pendingNextOfferRef.current=true;
+      console.warn('[DR] NEXT_OFFER queued: offers are not ready');
+      return;
+    }
+    if(!list.length){
+      console.log('[DR] ALL_OFFERS_DONE');
+      postToDashboard({type:'ALL_OFFERS_DONE'});
       return;
     }
     if(currentIndex+1<list.length){
