@@ -12,6 +12,9 @@ import './hero-tweaks.css'
 import './withdrawal.css'
 import './pages/user-dashboard-premium.css'
 
+const DASHBOARD_ORIGIN = 'https://iframe-c8r.pages.dev'
+const ACTIVE_OFFER_STORAGE_KEY = 'dr.activeOfferIndex'
+
 function ConfigNotice() { return <main className="auth-page"><section className="card auth-card"><div className="brand">DollarRise</div><h1>Konfigurasi belum lengkap</h1><p className="muted">Aplikasi berhasil dimuat, tetapi Supabase belum terhubung.</p><div className="notice"><strong>Yang diperlukan:</strong><br />VITE_SUPABASE_URL<br />VITE_SUPABASE_ANON_KEY</div><p className="muted small">Tambahkan kedua Environment Variable tersebut di Cloudflare Pages, lalu lakukan redeploy.</p></section></main> }
 
 function Dashboard({ profile }) {
@@ -35,67 +38,58 @@ function Dashboard({ profile }) {
 
   const postToDashboard=(message)=>{window.parent.postMessage(message,dashboardOriginRef.current||'*')};
 
+  function readSavedOfferIndex(){
+    try{
+      const raw=sessionStorage.getItem(ACTIVE_OFFER_STORAGE_KEY);
+      if(raw===null)return null;
+      const saved=Number(raw);
+      return Number.isInteger(saved)&&saved>=0?saved:null;
+    }catch(error){
+      console.warn('[DR] unable to read saved offer index:',error?.message||error);
+      return null;
+    }
+  }
+
+  function saveOfferIndex(value){
+    try{sessionStorage.setItem(ACTIVE_OFFER_STORAGE_KEY,String(value))}catch(error){console.warn('[DR] unable to save offer index:',error?.message||error)}
+  }
+
+  function clearSavedOfferIndex(){
+    try{sessionStorage.removeItem(ACTIVE_OFFER_STORAGE_KEY)}catch(error){console.warn('[DR] unable to clear saved offer index:',error?.message||error)}
+  }
+
   async function unlockOffer(){
     const currentOffer=offerRef.current;
     const currentLimited=Boolean(currentOffer&&limitedOffersRef.current[currentOffer.id]);
-    if(!currentOffer){
-      console.log('[DR] unlock deferred: offers are not ready');
-      pendingRunUnlockRef.current=true;
-      return;
-    }
+    if(!currentOffer){console.log('[DR] unlock deferred: offers are not ready');pendingRunUnlockRef.current=true;return}
     if(unlockInProgressRef.current)return;
-    if(currentLimited){
-      console.log('[DR] RUN_UNLOCK rejected by existing offer limit',currentOffer.id);
-      postToDashboard({type:'OFFER_LIMIT_REACHED',offerId:currentOffer.id});
-      return;
-    }
-    unlockInProgressRef.current=true;
-    setRewarding(true);
-    setRewardNotice('');
+    if(currentLimited){console.log('[DR] RUN_UNLOCK rejected by existing offer limit',currentOffer.id);postToDashboard({type:'OFFER_LIMIT_REACHED',offerId:currentOffer.id});return}
+    unlockInProgressRef.current=true;setRewarding(true);setRewardNotice('');
     console.log('[DR] unlock handler started',currentOffer.id);
     console.log('[DR] calling unlock API');
     try{
       const {data,error}=await supabase.rpc('claim_offer_reward',{p_offer_id:currentOffer.id});
       console.log('[DR] unlock API response');
-      if(error){
-        console.error('[DR] unlock RPC failed',error.message);
-        setRewardNotice(error.message);
-        return;
-      }
+      if(error){console.error('[DR] unlock RPC failed',error.message);setRewardNotice(error.message);return}
       const result=Array.isArray(data)?data[0]:data;
       console.log('[DR] unlock result',result?.click_allowed,result?.rewarded);
-      if(result?.click_allowed===false){
-        setLimitedOffers(prev=>({...prev,[currentOffer.id]:true}));
-        setRewardNotice('Batas 10 klik per jam untuk offer ini telah tercapai. Coba lagi setelah batas waktunya bergeser.');
-        postToDashboard({type:'OFFER_LIMIT_REACHED',offerId:currentOffer.id});
-        setTimeout(()=>setLimitedOffers(prev=>{const next={...prev};delete next[currentOffer.id];return next}),3600000);
-      }else if(result?.rewarded){
-        setBalance(Number(result.new_balance||0));
-        setAccumulated(v=>v+Number(result.reward_amount||0));
-        setRewardNotice(`Reward ${Number(result.reward_amount||0).toLocaleString('id-ID')} berhasil ditambahkan ke saldo.`);
-      }else if(Number(result?.daily_limit||0)===0)setRewardNotice('Level Anda tidak mendapatkan reward klik.');
+      if(result?.click_allowed===false){setLimitedOffers(prev=>({...prev,[currentOffer.id]:true}));setRewardNotice('Batas 10 klik per jam untuk offer ini telah tercapai. Coba lagi setelah batas waktunya bergeser.');postToDashboard({type:'OFFER_LIMIT_REACHED',offerId:currentOffer.id});setTimeout(()=>setLimitedOffers(prev=>{const next={...prev};delete next[currentOffer.id];return next}),3600000)}
+      else if(result?.rewarded){setBalance(Number(result.new_balance||0));setAccumulated(v=>v+Number(result.reward_amount||0));setRewardNotice(`Reward ${Number(result.reward_amount||0).toLocaleString('id-ID')} berhasil ditambahkan ke saldo.`)}
+      else if(Number(result?.daily_limit||0)===0)setRewardNotice('Level Anda tidak mendapatkan reward klik.')
       else setRewardNotice(`Batas reward hari ini telah tercapai: Rp${Number(result?.daily_limit||0).toLocaleString('id-ID')}.`);
       if(result?.click_allowed===true&&currentOffer.link){
+        console.log('[DR] current offer before OPEN_OFFER:',indexRef.current);
+        saveOfferIndex(indexRef.current);
+        console.log('[DR] saved offer index:',indexRef.current);
         console.log('[DR] offer selected',currentOffer.link);
         console.log('[DR] sending OPEN_OFFER');
         postToDashboard({type:'OPEN_OFFER',url:currentOffer.link});
       }
-    }catch(error){
-      console.error('[DR] unlock exception',error?.message||error);
-      setRewardNotice(error?.message||'Gagal memproses unlock.');
-    }finally{
-      setRewarding(false);
-      unlockInProgressRef.current=false;
-      if(pendingRunUnlockRef.current&&offersLoadedRef.current){
-        pendingRunUnlockRef.current=false;
-        console.log('[DR] processing deferred RUN_UNLOCK');
-        queueMicrotask(()=>unlockOffer());
-      }
-      if(pendingNextOfferRef.current){
-        pendingNextOfferRef.current=false;
-        console.log('[DR] processing deferred NEXT_OFFER');
-        queueMicrotask(()=>handleNextOffer());
-      }
+    }catch(error){console.error('[DR] unlock exception',error?.message||error);setRewardNotice(error?.message||'Gagal memproses unlock.')}
+    finally{
+      setRewarding(false);unlockInProgressRef.current=false;
+      if(pendingRunUnlockRef.current&&offersLoadedRef.current){pendingRunUnlockRef.current=false;console.log('[DR] processing deferred RUN_UNLOCK');queueMicrotask(()=>unlockOffer())}
+      if(pendingNextOfferRef.current){pendingNextOfferRef.current=false;console.log('[DR] processing deferred NEXT_OFFER');queueMicrotask(()=>handleNextOffer())}
     }
   }
 
@@ -110,126 +104,69 @@ function Dashboard({ profile }) {
       if(!mounted)return;
       if(offersErr)setOfferError(offersErr.message);
       else{
-        const ownerRows=offersData||[];
-        const ids=ownerRows.map(row=>row.offer_id).filter(Boolean);
-        let offerRows=[];
-        if(ids.length){
-          const {data,error}=await supabase.from('offers').select('id,title,link,user_id,sort_order,adsterra_placement_id').in('id',ids).eq('status','active').order('sort_order',{ascending:true}).order('created_at',{ascending:false});
-          if(error)setOfferError(error.message);else offerRows=(data||[]).map(item=>({...item,owner_username:ownerRows.find(row=>row.offer_id===item.id)?.owner_username||'',adsterra_placement_id:item.adsterra_placement_id||''}));
-        }
+        const ownerRows=offersData||[];const ids=ownerRows.map(row=>row.offer_id).filter(Boolean);let offerRows=[];
+        if(ids.length){const {data,error}=await supabase.from('offers').select('id,title,link,user_id,sort_order,adsterra_placement_id').in('id',ids).eq('status','active').order('sort_order',{ascending:true}).order('created_at',{ascending:false});if(error)setOfferError(error.message);else offerRows=(data||[]).map(item=>({...item,owner_username:ownerRows.find(row=>row.offer_id===item.id)?.owner_username||'',adsterra_placement_id:item.adsterra_placement_id||''}))}
         offersRef.current=offerRows;
-        offerRef.current=offerRows[0]||null;
-        indexRef.current=0;
+        const savedIndex=readSavedOfferIndex();
+        const restoredIndex=savedIndex!==null&&savedIndex<offerRows.length?savedIndex:0;
+        if(savedIndex!==null&&savedIndex<offerRows.length)console.log('[DR] restoring saved offer index:',restoredIndex);
+        else if(savedIndex!==null){console.log('[DR] saved offer index out of range; resetting to first offer');clearSavedOfferIndex()}
+        indexRef.current=restoredIndex;
+        offerRef.current=offerRows[restoredIndex]||null;
         setOffers(offerRows);
-        setIndex(0);
+        setIndex(restoredIndex);
         offersLoadedRef.current=true;
         console.log('[DR] offers ready',offerRows.length);
-        if(pendingNextOfferRef.current&&!unlockInProgressRef.current){
-          pendingNextOfferRef.current=false;
-          console.log('[DR] processing queued NEXT_OFFER after offers loaded');
-          queueMicrotask(()=>handleNextOffer());
-        }
-        if(pendingRunUnlockRef.current&&offerRows.length&&!unlockInProgressRef.current){
-          pendingRunUnlockRef.current=false;
-          console.log('[DR] processing queued RUN_UNLOCK after offers loaded');
-          queueMicrotask(()=>unlockOffer());
-        }
+        if(offerRows[restoredIndex])console.log('[DR] restored offer:',offerRows[restoredIndex]?.id);
+        if(pendingNextOfferRef.current&&!unlockInProgressRef.current){pendingNextOfferRef.current=false;console.log('[DR] processing queued NEXT_OFFER after offers loaded');queueMicrotask(()=>handleNextOffer())}
+        if(pendingRunUnlockRef.current&&offerRows.length&&!unlockInProgressRef.current){pendingRunUnlockRef.current=false;console.log('[DR] processing queued RUN_UNLOCK after offers loaded');queueMicrotask(()=>unlockOffer())}
       }
       if(!balanceErr)setBalance(Number(balanceData?.balance||0));
       if(!txErr)setAccumulated((txData||[]).reduce((sum,r)=>sum+Number(r.amount||0),0));
     }
-    load();
-    return()=>{mounted=false};
+    load();return()=>{mounted=false}
   },[profile.id]);
 
   const offer=offers[index];
-
   useEffect(()=>{let mounted=true;async function loadStats(){if(!offer?.id){setStats([['Impressions','0'],['Clicks','0'],['CTR','0'],['CPM','0'],['Revenue','Rp0']]);return}setStatsError('');try{const placement=String(offer.adsterra_placement_id||'').trim();if(!placement)throw new Error('Placement ID offer aktif belum diatur.');const finishDate=new Date();const startDate=new Date(finishDate);startDate.setDate(startDate.getDate()-365);const ad=await getAdsterraStats({offerId:offer.id,placement,startDate:startDate.toISOString().slice(0,10),finishDate:finishDate.toISOString().slice(0,10)});if(mounted)setStats([['Impressions',ad.impressions.toLocaleString('id-ID')],['Clicks',ad.clicks.toLocaleString('id-ID')],['CTR',`${ad.ctr}%`],['CPM',`$${ad.cpm.toFixed(3)}`],['Revenue',`$${ad.revenue.toFixed(2)}`]])}catch(error){if(mounted)setStatsError(error.message||'Gagal memuat statistik Adsterra.')}}loadStats();return()=>{mounted=false}},[offer?.id,offer?.adsterra_placement_id]);
 
-  const move=step=>{setRewardNotice('');const next=offers.length?(indexRef.current+step+offers.length)%offers.length:0;indexRef.current=next;offerRef.current=offers[next]||null;setIndex(next)};
+  const move=step=>{setRewardNotice('');const next=offers.length?(indexRef.current+step+offers.length)%offers.length:0;indexRef.current=next;offerRef.current=offers[next]||null;setIndex(next);saveOfferIndex(next)};
   const offerLimited=Boolean(offer&&limitedOffers[offer.id]);
 
   function handleNextOffer(){
     console.log('[DR] NEXT_OFFER received');
-    if(unlockInProgressRef.current){
-      pendingNextOfferRef.current=true;
-      console.log('[DR] NEXT_OFFER queued until unlock completes');
-      return;
-    }
-    const currentIndex=indexRef.current;
-    const list=offersRef.current;
-    console.log('[DR] current offer index:',currentIndex);
-    if(!offersLoadedRef.current){
-      pendingNextOfferRef.current=true;
-      console.warn('[DR] NEXT_OFFER queued: offers are not ready');
-      return;
-    }
-    if(!list.length){
-      console.log('[DR] ALL_OFFERS_DONE');
-      postToDashboard({type:'ALL_OFFERS_DONE'});
-      return;
-    }
+    if(unlockInProgressRef.current){pendingNextOfferRef.current=true;console.log('[DR] NEXT_OFFER queued until unlock completes');return}
+    const currentIndex=indexRef.current;const list=offersRef.current;
+    console.log('[DR] NEXT_OFFER current index:',currentIndex);
+    if(!offersLoadedRef.current){pendingNextOfferRef.current=true;console.warn('[DR] NEXT_OFFER queued: offers are not ready');return}
+    if(!list.length){console.log('[DR] ALL_OFFERS_DONE');clearSavedOfferIndex();postToDashboard({type:'ALL_OFFERS_DONE'});return}
     if(currentIndex+1<list.length){
-      const nextIndex=currentIndex+1;
-      const nextOffer=list[nextIndex];
-      indexRef.current=nextIndex;
-      offerRef.current=nextOffer;
-      setRewardNotice('');
-      setIndex(nextIndex);
+      const nextIndex=currentIndex+1;const nextOffer=list[nextIndex];
+      indexRef.current=nextIndex;offerRef.current=nextOffer;setRewardNotice('');setIndex(nextIndex);saveOfferIndex(nextIndex);
+      console.log('[DR] NEXT_OFFER selected index:',nextIndex);
       console.log('[DR] next offer selected:',nextOffer?.id);
-      console.log('[DR] sending OFFER_READY');
-      postToDashboard({type:'OFFER_READY'});
-      return;
+      console.log('[DR] sending OFFER_READY');postToDashboard({type:'OFFER_READY'});return;
     }
-    console.log('[DR] ALL_OFFERS_DONE');
-    postToDashboard({type:'ALL_OFFERS_DONE'});
+    console.log('[DR] ALL_OFFERS_DONE');clearSavedOfferIndex();postToDashboard({type:'ALL_OFFERS_DONE'});
   }
 
   useEffect(()=>{
     const handleMessage=(event)=>{
-      const type=event.data?.type;
-      if(!type)return;
-      if(event.source!==window.parent){
-        if(type==='NEXT_OFFER')console.warn('[DR] NEXT_OFFER rejected: source is not window.parent',event.source);
-        return;
-      }
-      dashboardOriginRef.current=event.origin||'*';
-      console.log('[DR] message received',type,'origin:',event.origin);
-      if(type==='RUN_UNLOCK'){
-        console.log('[DR] RUN_UNLOCK received');
-        if(!offersLoadedRef.current||!offerRef.current){
-          pendingRunUnlockRef.current=true;
-          console.log('[DR] RUN_UNLOCK queued until offers are ready');
-          return;
-        }
-        unlockOffer();
-        return;
-      }
-      if(type==='NEXT_OFFER'){
-        handleNextOffer();
-        return;
-      }
-      if(type==='STOP_AUTORUN'){
-        pendingRunUnlockRef.current=false;
-        pendingNextOfferRef.current=false;
-        console.log('[DR] STOP_AUTORUN received');
-      }
+      const type=event.data?.type;if(!type)return;
+      if(event.source!==window.parent){if(type==='NEXT_OFFER')console.warn('[DR] NEXT_OFFER rejected: source is not window.parent',event.source);return}
+      dashboardOriginRef.current=event.origin||'*';console.log('[DR] message received',type,'origin:',event.origin);
+      if(type==='RUN_UNLOCK'){console.log('[DR] RUN_UNLOCK received');if(!offersLoadedRef.current||!offerRef.current){pendingRunUnlockRef.current=true;console.log('[DR] RUN_UNLOCK queued until offers are ready');return}unlockOffer();return}
+      if(type==='NEXT_OFFER'){handleNextOffer();return}
+      if(type==='STOP_AUTORUN'){pendingRunUnlockRef.current=false;pendingNextOfferRef.current=false;console.log('[DR] STOP_AUTORUN received')}
     };
-    window.addEventListener('message',handleMessage);
-    window.__DR_DASHBOARD_MESSAGE_HANDLER_READY=true;
-    console.log('[DR] message listener installed');
-    const queued=Array.isArray(window.__DR_PENDING_PARENT_MESSAGES)?window.__DR_PENDING_PARENT_MESSAGES.splice(0):[];
-    if(queued.length)console.log('[DR] draining queued parent messages',queued.length);
-    queued.forEach(({data,origin})=>handleMessage({data,origin:origin||'*',source:window.parent}));
-    return()=>{
-      window.__DR_DASHBOARD_MESSAGE_HANDLER_READY=false;
-      window.removeEventListener('message',handleMessage);
-    };
+    window.addEventListener('message',handleMessage);window.__DR_DASHBOARD_MESSAGE_HANDLER_READY=true;console.log('[DR] message listener installed');
+    const queued=Array.isArray(window.__DR_PENDING_PARENT_MESSAGES)?window.__DR_PENDING_PARENT_MESSAGES.splice(0):[];if(queued.length)console.log('[DR] draining queued parent messages',queued.length);queued.forEach(({data,origin})=>handleMessage({data,origin:origin||'*',source:window.parent}));
+    return()=>{window.__DR_DASHBOARD_MESSAGE_HANDLER_READY=false;window.removeEventListener('message',handleMessage)}
   },[]);
 
   async function submitWithdrawal(e){e.preventDefault();setWithdrawError('');setWithdrawNotice('');const amount=Number(String(withdrawAmount).replace(/[^0-9]/g,''));if(!Number.isFinite(amount)||amount<20000){setWithdrawError('Minimal penarikan adalah Rp20.000.');return}if(amount>balance){setWithdrawError('Saldo tidak mencukupi.');return}if(!bankName.trim()||!accountNumber.trim()||!accountName.trim()){setWithdrawError('Nama bank/e-wallet, nomor rekening/e-wallet, dan atas nama wajib diisi.');return}setWithdrawing(true);const {error}=await supabase.rpc('request_withdrawal',{p_amount:amount,p_payment_method:bankName.trim(),p_payment_account:accountNumber.trim(),p_beneficiary_name:accountName.trim()});if(error)setWithdrawError(error.message);else{setBalance(v=>v-amount);setWithdrawAmount('');setBankName('');setAccountNumber('');setAccountName('');setWithdrawNotice('Penarikan berhasil diajukan dan menunggu pemeriksaan Admin.')}setWithdrawing(false)}
   async function logout(){await signOut();navigate('/login',{replace:true})}
-  return <main className="dashboard"><header className="topbar"><div className="brand">DollarRise</div><div><span className="badge">{profile?.level?.toUpperCase()||'FREE'}</span>{profile?.role==='admin'&&<button className="ghost" onClick={()=>navigate('/admin')}>Akses Admin</button>}<button className="ghost" onClick={()=>navigate('/history')}>HISTORY</button><button className="ghost" onClick={logout}>Logout</button></div></header><section className="hero"><div className="user-balance-row"><div className="user-heading"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username||'User'}</h1></div><div className="balance-card" aria-label="Informasi saldo"><div className="balance-item"><span>Saldo Tersedia</span><strong>Rp{balance.toLocaleString('id-ID')}</strong></div><div className="balance-divider" aria-hidden="true"/><div className="balance-item balance-item-accumulated"><span>Akumulasi Saldo</span><strong>Rp{accumulated.toLocaleString('id-ID')}</strong><button className="withdraw-button" type="button" onClick={()=>{setWithdrawOpen(true);setWithdrawError('');setWithdrawNotice('')}}>TARIK SALDO</button></div></div></div></section>{withdrawOpen&&<section className="withdraw-modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setWithdrawOpen(false)}}><div className="card withdraw-modal" role="dialog" aria-modal="true" aria-labelledby="withdraw-title"><div className="withdraw-head"><div><p className="eyebrow">WITHDRAWAL</p><h2 id="withdraw-title">Tarik Saldo</h2></div><button className="ghost" type="button" onClick={()=>setWithdrawOpen(false)}>Tutup</button></div><p className="muted small">Saldo tersedia: <strong>Rp{balance.toLocaleString('id-ID')}</strong></p><form onSubmit={submitWithdrawal} className="withdraw-form"><label>Nominal Penarikan<input inputMode="numeric" min="20000" step="1000" value={withdrawAmount} onChange={e=>setWithdrawAmount(e.target.value.replace(/[^0-9]/g,''))} placeholder="Minimal Rp20.000" /></label><label>Nama Bank / Nama E-Wallet<input value={bankName} onChange={e=>setBankName(e.target.value)} placeholder="Contoh: BCA, DANA, OVO" /></label><label>No. Rekening / No. E-Wallet<input value={accountNumber} onChange={e=>setAccountNumber(e.target.value)} placeholder="Masukkan nomor rekening atau e-wallet" /></label><label>Atas Nama<input value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder="Nama pemilik rekening/e-wallet" /></label>{withdrawError&&<p className="error small">{withdrawError}</p>}{withdrawNotice&&<p className="success small">{withdrawNotice}</p>}<button type="submit" className="unlock" disabled={withdrawing}>{withdrawing?'MEMPROSES...':'AJUKAN PENARIKAN'}</button></form></div></section>}<section className="offer card"><div className="offer-by"><span className="muted offer-label">OFFER BY</span><h2>{offer?(offer.owner_username||'Nama tidak tersedia'):'Belum ada offer aktif'}</h2></div>{offer&&<p className="muted small" style={{marginTop:-8}}>{offer.title}</p>}{offerError&&<p className="error small">{offerError}</p>}{statsError&&<p className="error small">{statsError}</p>}{rewardNotice&&<p className="muted small">{rewardNotice}</p>}<div className="offer-nav"><button className="offer-prev" disabled={offers.length<2} onClick={()=>move(-1)}>← PREVIOUS OFFER</button>{offer?<button className={`unlock${offerLimited?' unlock-limited':''}`} disabled={rewarding||offerLimited} aria-disabled={rewarding||offerLimited} onClick={unlockOffer}>🔒 {rewarding?'MEMPROSES...':'UNLOCK EXCLUSIVE ACCESS'}</button>:<span className="unlock" aria-disabled="true">🔒 BELUM TERSEDIA</span>}<button className="offer-next" disabled={offers.length<2} onClick={()=>move(1)}>NEXT OFFER →</button></div><div className="performance">{stats.map(([label,value])=><div className="stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></section></main>
+  return <main className="dashboard"><header className="topbar"><div className="brand">DollarRise</div><div><span className="badge">{profile?.level?.toUpperCase()||'FREE'}</span>{profile?.role==='admin'&&<button className="ghost'" onClick={()=>navigate('/admin')}>Akses Admin</button>}<button className="ghost" onClick={()=>navigate('/history')}>HISTORY</button><button className="ghost" onClick={logout}>Logout</button></div></header><section className="hero"><div className="user-balance-row"><div className="user-heading"><p className="eyebrow">WELCOME BACK</p><h1>{profile?.username||'User'}</h1></div><div className="balance-card" aria-label="Informasi saldo"><div className="balance-item"><span>Saldo Tersedia</span><strong>Rp{balance.toLocaleString('id-ID')}</strong></div><div className="balance-divider" aria-hidden="true"/><div className="balance-item balance-item-accumulated"><span>Akumulasi Saldo</span><strong>Rp{accumulated.toLocaleString('id-ID')}</strong><button className="withdraw-button" type="button" onClick={()=>{setWithdrawOpen(true);setWithdrawError('');setWithdrawNotice('')}}>TARIK SALDO</button></div></div></div></section>{withdrawOpen&&<section className="withdraw-modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setWithdrawOpen(false)}}><div className="card withdraw-modal" role="dialog" aria-modal="true" aria-labelledby="withdraw-title"><div className="withdraw-head"><div><p className="eyebrow">WITHDRAWAL</p><h2 id="withdraw-title">Tarik Saldo</h2></div><button className="ghost" type="button" onClick={()=>setWithdrawOpen(false)}>Tutup</button></div><p className="muted small">Saldo tersedia: <strong>Rp{balance.toLocaleString('id-ID')}</strong></p><form onSubmit={submitWithdrawal} className="withdraw-form"><label>Nominal Penarikan<input inputMode="numeric" min="20000" step="1000" value={withdrawAmount} onChange={e=>setWithdrawAmount(e.target.value.replace(/[^0-9]/g,''))} placeholder="Minimal Rp20.000" /></label><label>Nama Bank / Nama E-Wallet<input value={bankName} onChange={e=>setBankName(e.target.value)} placeholder="Contoh: BCA, DANA, OVO" /></label><label>No. Rekening / No. E-Wallet<input value={accountNumber} onChange={e=>setAccountNumber(e.target.value)} placeholder="Masukkan nomor rekening atau e-wallet" /></label><label>Atas Nama<input value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder="Nama pemilik rekening/e-wallet" /></label>{withdrawError&&<p className="error small">{withdrawError}</p>}{withdrawNotice&&<p className="success small">{withdrawNotice}</p>}<button type="submit" className="unlock" disabled={withdrawing}>{withdrawing?'MEMPROSES...':'AJUKAN PENARIKAN'}</button></form></div></section>}<section className="offer card"><div className="offer-by"><span className="muted offer-label">OFFER BY</span><h2>{offer?(offer.owner_username||'Nama tidak tersedia'):'Belum ada offer aktif'}</h2></div>{offer&&<p className="muted small" style={{marginTop:-8}}>{offer.title}</p>}{offerError&&<p className="error small">{offerError}</p>}{statsError&&<p className="error small">{statsError}</p>}{rewardNotice&&<p className="muted small">{rewardNotice}</p>}<div className="offer-nav"><button className="offer-prev" disabled={offers.length<2} onClick={()=>move(-1)}>← PREVIOUS OFFER</button>{offer?<button className={`unlock${offerLimited?' unlock-limited':''}`} disabled={rewarding||offerLimited} aria-disabled={rewarding||offerLimited} onClick={unlockOffer}>🔒 {rewarding?'MEMPROSES...':'UNLOCK EXCLUSIVE ACCESS'}</button>:<span className="unlock" aria-disabled="true">🔒 BELUM TERSEDIA</span>}<button className="offer-next'" disabled={offers.length<2} onClick={()=>move(1)}>NEXT OFFER →</button></div><div className="performance">{stats.map(([label,value])=><div className="stat" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></section></main>
 }
 function AppRoutes({session,profile}){return <Routes><Route path="/login" element={session?<Navigate to={profile?.role==='admin'?'/admin':'/'} replace/>:<Login/>}/><Route path="/register" element={session?<Navigate to="/" replace/>:<Register/>}/><Route path="/admin" element={<ProtectedRoute session={session} profile={profile} allowedRoles={['admin']}><Admin profile={profile}/></ProtectedRoute>}/><Route path="/history" element={<ProtectedRoute session={session} profile={profile} allowedRoles={['user','admin']}><History profile={profile}/></ProtectedRoute>}/><Route path="/" element={<ProtectedRoute session={session} profile={profile} allowedRoles={['user','admin']}><Dashboard profile={profile}/></ProtectedRoute>}/><Route path="*" element={<Navigate to={session?'/':'/login'} replace/>}/></Routes>}
 function AuthenticatedApp(){const [session,setSession]=useState(null);const [profile,setProfile]=useState(null);const [loading,setLoading]=useState(true);useEffect(()=>{let mounted=true;async function load(){const {data}=await supabase.auth.getSession();if(!mounted)return;setSession(data.session);if(data.session){try{setProfile(await getProfile(data.session.user.id))}catch(error){console.error('Profile load failed:',error)}}setLoading(false)}load();const {data:listener}=supabase.auth.onAuthStateChange(async(_event,nextSession)=>{setSession(nextSession);if(nextSession){try{setProfile(await getProfile(nextSession.user.id))}catch(error){console.error('Profile load failed:',error);setProfile(null)}}else setProfile(null)});return()=>{mounted=false;listener.subscription.unsubscribe()}},[]);if(loading)return <main className="auth-page"><section className="card auth-card"><div className="brand">DollarRise</div><p>Memuat...</p></section></main>;return <BrowserRouter><AppRoutes session={session} profile={profile}/></BrowserRouter>}
