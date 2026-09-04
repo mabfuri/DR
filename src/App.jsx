@@ -12,8 +12,6 @@ import './hero-tweaks.css'
 import './withdrawal.css'
 import './pages/user-dashboard-premium.css'
 
-const DASHBOARD_ORIGIN = 'https://iframe-c8r.pages.dev'
-
 function ConfigNotice() { return <main className="auth-page"><section className="card auth-card"><div className="brand">DollarRise</div><h1>Konfigurasi belum lengkap</h1><p className="muted">Aplikasi berhasil dimuat, tetapi Supabase belum terhubung.</p><div className="notice"><strong>Yang diperlukan:</strong><br />VITE_SUPABASE_URL<br />VITE_SUPABASE_ANON_KEY</div><p className="muted small">Tambahkan kedua Environment Variable tersebut di Cloudflare Pages, lalu lakukan redeploy.</p></section></main> }
 
 function Dashboard({ profile }) {
@@ -27,14 +25,15 @@ function Dashboard({ profile }) {
   const offersRef=useRef(offers);
   const offersLoadedRef=useRef(false);
   const pendingRunUnlockRef=useRef(false);
-  const dashboardOriginRef=useRef(DASHBOARD_ORIGIN);
+  const pendingNextOfferRef=useRef(false);
+  const dashboardOriginRef=useRef('*');
 
   useEffect(()=>{limitedOffersRef.current=limitedOffers},[limitedOffers]);
   useEffect(()=>{offerRef.current=offers[index]||null},[offers,index]);
   useEffect(()=>{indexRef.current=index},[index]);
   useEffect(()=>{offersRef.current=offers},[offers]);
 
-  const postToDashboard=(message)=>{window.parent.postMessage(message,dashboardOriginRef.current)};
+  const postToDashboard=(message)=>{window.parent.postMessage(message,dashboardOriginRef.current||'*')};
 
   async function unlockOffer(){
     const currentOffer=offerRef.current;
@@ -53,9 +52,11 @@ function Dashboard({ profile }) {
     unlockInProgressRef.current=true;
     setRewarding(true);
     setRewardNotice('');
-    console.log('[DR] unlock started',currentOffer.id);
+    console.log('[DR] unlock handler started',currentOffer.id);
+    console.log('[DR] calling unlock API');
     try{
       const {data,error}=await supabase.rpc('claim_offer_reward',{p_offer_id:currentOffer.id});
+      console.log('[DR] unlock API response');
       if(error){
         console.error('[DR] unlock RPC failed',error.message);
         setRewardNotice(error.message);
@@ -89,6 +90,11 @@ function Dashboard({ profile }) {
         pendingRunUnlockRef.current=false;
         console.log('[DR] processing deferred RUN_UNLOCK');
         queueMicrotask(()=>unlockOffer());
+      }
+      if(pendingNextOfferRef.current){
+        pendingNextOfferRef.current=false;
+        console.log('[DR] processing deferred NEXT_OFFER');
+        queueMicrotask(()=>handleNextOffer());
       }
     }
   }
@@ -138,14 +144,46 @@ function Dashboard({ profile }) {
   const move=step=>{setRewardNotice('');const next=offers.length?(indexRef.current+step+offers.length)%offers.length:0;indexRef.current=next;offerRef.current=offers[next]||null;setIndex(next)};
   const offerLimited=Boolean(offer&&limitedOffers[offer.id]);
 
+  function handleNextOffer(){
+    console.log('[DR] NEXT_OFFER received');
+    if(unlockInProgressRef.current){
+      pendingNextOfferRef.current=true;
+      console.log('[DR] NEXT_OFFER queued until unlock completes');
+      return;
+    }
+    const currentIndex=indexRef.current;
+    const list=offersRef.current;
+    console.log('[DR] current offer index:',currentIndex);
+    if(!offersLoadedRef.current||!list.length){
+      console.warn('[DR] NEXT_OFFER rejected: offers are not ready');
+      return;
+    }
+    if(currentIndex+1<list.length){
+      const nextIndex=currentIndex+1;
+      const nextOffer=list[nextIndex];
+      indexRef.current=nextIndex;
+      offerRef.current=nextOffer;
+      setRewardNotice('');
+      setIndex(nextIndex);
+      console.log('[DR] next offer selected:',nextOffer?.id);
+      console.log('[DR] sending OFFER_READY');
+      postToDashboard({type:'OFFER_READY'});
+      return;
+    }
+    console.log('[DR] ALL_OFFERS_DONE');
+    postToDashboard({type:'ALL_OFFERS_DONE'});
+  }
+
   useEffect(()=>{
     const handleMessage=(event)=>{
-      if(event.origin!==DASHBOARD_ORIGIN)return;
-      if(event.source!==window.parent)return;
       const type=event.data?.type;
       if(!type)return;
-      dashboardOriginRef.current=event.origin;
-      console.log('[DR] message received',type);
+      if(event.source!==window.parent){
+        if(type==='NEXT_OFFER')console.warn('[DR] NEXT_OFFER rejected: source is not window.parent',event.source);
+        return;
+      }
+      dashboardOriginRef.current=event.origin||'*';
+      console.log('[DR] message received',type,'origin:',event.origin);
       if(type==='RUN_UNLOCK'){
         console.log('[DR] RUN_UNLOCK received');
         if(!offersLoadedRef.current||!offerRef.current){
@@ -157,30 +195,25 @@ function Dashboard({ profile }) {
         return;
       }
       if(type==='NEXT_OFFER'){
-        if(unlockInProgressRef.current)return;
-        const currentIndex=indexRef.current;
-        const list=offersRef.current;
-        if(currentIndex+1<list.length){
-          const nextIndex=currentIndex+1;
-          indexRef.current=nextIndex;
-          offerRef.current=list[nextIndex];
-          setRewardNotice('');
-          setIndex(nextIndex);
-          console.log('[DR] NEXT_OFFER -> OFFER_READY',list[nextIndex]?.id);
-          postToDashboard({type:'OFFER_READY'});
-        }else if(list.length){
-          console.log('[DR] NEXT_OFFER -> ALL_OFFERS_DONE');
-          postToDashboard({type:'ALL_OFFERS_DONE'});
-        }
+        handleNextOffer();
+        return;
       }
       if(type==='STOP_AUTORUN'){
         pendingRunUnlockRef.current=false;
+        pendingNextOfferRef.current=false;
         console.log('[DR] STOP_AUTORUN received');
       }
     };
     window.addEventListener('message',handleMessage);
+    window.__DR_DASHBOARD_MESSAGE_HANDLER_READY=true;
     console.log('[DR] message listener installed');
-    return()=>window.removeEventListener('message',handleMessage);
+    const queued=Array.isArray(window.__DR_PENDING_PARENT_MESSAGES)?window.__DR_PENDING_PARENT_MESSAGES.splice(0):[];
+    if(queued.length)console.log('[DR] draining queued parent messages',queued.length);
+    queued.forEach(({data,origin})=>handleMessage({data,origin:origin||'*',source:window.parent}));
+    return()=>{
+      window.__DR_DASHBOARD_MESSAGE_HANDLER_READY=false;
+      window.removeEventListener('message',handleMessage);
+    };
   },[]);
 
   async function submitWithdrawal(e){e.preventDefault();setWithdrawError('');setWithdrawNotice('');const amount=Number(String(withdrawAmount).replace(/[^0-9]/g,''));if(!Number.isFinite(amount)||amount<20000){setWithdrawError('Minimal penarikan adalah Rp20.000.');return}if(amount>balance){setWithdrawError('Saldo tidak mencukupi.');return}if(!bankName.trim()||!accountNumber.trim()||!accountName.trim()){setWithdrawError('Nama bank/e-wallet, nomor rekening/e-wallet, dan atas nama wajib diisi.');return}setWithdrawing(true);const {error}=await supabase.rpc('request_withdrawal',{p_amount:amount,p_payment_method:bankName.trim(),p_payment_account:accountNumber.trim(),p_beneficiary_name:accountName.trim()});if(error)setWithdrawError(error.message);else{setBalance(v=>v-amount);setWithdrawAmount('');setBankName('');setAccountNumber('');setAccountName('');setWithdrawNotice('Penarikan berhasil diajukan dan menunggu pemeriksaan Admin.')}setWithdrawing(false)}
